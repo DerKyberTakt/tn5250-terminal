@@ -6,6 +6,7 @@ import { DEFAULT_OIA } from '../shared/protocol';
 import { SETTINGS_DEFAULTS, buildTitle, type TerminalSettings } from '../shared/settings';
 import * as path from 'node:path';
 import { buildDemoScreen } from '../engine/demoScreen';
+import { HostConnection } from './connection';
 import { SessionController } from './sessionController';
 import { readDefaults, resolvedSessions } from './settingsStore';
 import { certPassphraseKey, passwordKey } from './secrets';
@@ -145,7 +146,7 @@ export class TerminalPanel {
         nextDeviceName: () => (this.deviceTemplate && /[*=]/.test(this.deviceTemplate) ? TerminalPanel.expandDevice(this.deviceTemplate) : undefined),
         password: async () => (await context.secrets.get(passwordKey(profile.name, profile.host))) ?? (await context.secrets.get(passwordKey('', profile.host))),
         log: (message) => this.output.appendLine(`[${label}] ${message}`),
-      });
+      }, (events) => new HostConnection(events));
     }
 
     this.disposables.push(
