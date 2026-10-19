@@ -126,8 +126,8 @@ export class TerminalPanel {
           this.post({ type: 'screen', screen });
           this.post({ type: 'oia', oia });
         },
-        status: (status, detail) => {
-          this.post({ type: 'status', status, detail });
+        status: (status, detail, info) => {
+          this.post({ type: 'status', status, detail, info });
           this.output.appendLine(`[${label}] ${status}: ${detail}`);
           TerminalPanel.onActiveChanged?.();
         },
@@ -292,6 +292,12 @@ export class TerminalPanel {
         break;
       case 'copy':
         void vscode.env.clipboard.writeText(msg.text);
+        break;
+      case 'reconnect':
+        this.controller?.reconnectNow();
+        break;
+      case 'cancelReconnect':
+        this.controller?.disconnect();
         break;
       case 'paste':
         void vscode.env.clipboard.readText().then((text) => this.post({ type: 'paste', text }));

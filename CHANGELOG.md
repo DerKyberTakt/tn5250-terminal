@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2
+
+- SEU syntax colouring for RPG/RPGLE (fixed, free, fully free, embedded SQL), CL, DDS and DB2 SQL. The language comes from the source file name (QRPGLESRC, QCLLESRC, QDDSSRC, QSQLSRC ...) or the code itself; colours follow the 5250 colour settings, and the host's own colours (errors, reverse image) are left alone.
+- Connection overlay: a card over the dimmed screen while connecting (Cancel) and when the connection is lost, with the reason, a live reconnect countdown, Reconnect now / Stop (Enter / Esc). Keys no longer vanish silently while disconnected.
+- Plain-language connection errors (refused, host not found, no answer, unreachable, reset, TLS certificate / wrong port).
+- Dropped networks are noticed sooner (TCP keepalive after 15 s idle).
+- Enhanced UI: input fields longer than 60 characters (command lines, QSH, long comment fields) get a thin underline instead of a box; SEU source lines stay plain.
+- New icon.
+
 ## 0.1.1
 
 - Settings: Add Connection works again (the new entry was hidden because it had no host yet).
