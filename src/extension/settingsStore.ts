@@ -112,6 +112,7 @@ const DEFAULT_KEYS: Record<keyof TerminalSettings, string | undefined> = {
   switchToNewTab: 'tabs.switchToNewTab',
   warnOnCloseMultiple: 'tabs.warnOnCloseMultiple',
   mouseWheelPaging: 'behavior.mouseWheelPaging',
+  typeAhead: 'behavior.typeAhead',
   alarm: 'behavior.alarm',
   keyClick: 'behavior.keyClick',
   keymap: 'keyboard.keymap',

@@ -7,6 +7,8 @@
 - Plain-language connection errors (refused, host not found, no answer, unreachable, reset, TLS certificate / wrong port).
 - Dropped networks are noticed sooner (TCP keepalive after 15 s idle).
 - Enhanced UI: input fields longer than 60 characters (command lines, QSH, long comment fields) get a thin underline instead of a box; SEU source lines stay plain.
+- Type-ahead: keys pressed while the keyboard is locked (X SYSTEM) are kept and replayed when the host unlocks it, up to the next Enter or function key; an error message or Reset discards the rest. The status line shows how many are waiting. Settings → Behavior → Type-ahead (on by default).
+- Enhanced UI: field boxes end where the host ends the field's underline (a plain attribute inside the field), as ACS shows it — e.g. database record editors that define long input fields but underline only the data length.
 - New icon.
 
 ## 0.1.1

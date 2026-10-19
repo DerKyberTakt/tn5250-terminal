@@ -821,6 +821,11 @@
           "type": "boolean",
           "description": "TN5250: mouse wheel paging. Set it on the TN5250 Settings page."
         },
+        "tn5250.behavior.typeAhead": {
+          "default": true,
+          "type": "boolean",
+          "description": "TN5250: type-ahead. Set it on the TN5250 Settings page."
+        },
         "tn5250.behavior.alarm": {
           "default": true,
           "type": "boolean",
