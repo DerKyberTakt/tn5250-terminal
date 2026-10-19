@@ -53,6 +53,7 @@ export class SettingsPanel {
 
     panel.webview.onDidReceiveMessage((msg: SettingsToHost) => void this.onMessage(msg), undefined, context.subscriptions);
     panel.onDidDispose(() => {
+      this.disposed = true;
       if (SettingsPanel.current === this) SettingsPanel.current = undefined;
     });
     vscode.workspace.onDidChangeConfiguration(
@@ -64,8 +65,17 @@ export class SettingsPanel {
     );
   }
 
+  private disposed = false;
+
   private push(patch?: Partial<TerminalSettings>): void {
-    void this.buildData(patch).then((msg) => this.panel.webview.postMessage(msg));
+    void this.buildData(patch).then((msg) => {
+      if (this.disposed) return;
+      try {
+        void this.panel.webview.postMessage(msg).then(undefined, () => undefined);
+      } catch {
+        // closed while the data was being built
+      }
+    });
   }
 
   private async buildData(patch?: Partial<TerminalSettings>): Promise<HostToSettings> {

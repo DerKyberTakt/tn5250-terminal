@@ -2,7 +2,7 @@
   "name": "tn5250-terminal",
   "displayName": "TN5250 Terminal for IBM i",
   "description": "5250 terminal emulator for IBM i (AS/400) that opens as a VS Code editor tab. Pure TypeScript TN5250 client, nothing else to install.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "DerKyberTakt",
   "license": "MIT",
   "private": true,
@@ -524,7 +524,9 @@
             "topLeft",
             "topRight",
             "bottomLeft",
-            "bottomRight"
+            "bottomRight",
+            "custom",
+            "tile"
           ],
           "description": "TN5250: watermark position. Set it on the TN5250 Settings page."
         },
@@ -532,6 +534,20 @@
           "default": 10,
           "type": "integer",
           "description": "TN5250: watermark padding. Set it on the TN5250 Settings page."
+        },
+        "tn5250.watermark.x": {
+          "default": 50,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "TN5250: watermark horizontal position in percent (position Custom). Set it on the TN5250 Settings page."
+        },
+        "tn5250.watermark.y": {
+          "default": 50,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "TN5250: watermark vertical position in percent (position Custom). Set it on the TN5250 Settings page."
         },
         "tn5250.colors.green": {
           "default": "#00d060",

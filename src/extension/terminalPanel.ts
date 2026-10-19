@@ -30,6 +30,7 @@ export class TerminalPanel {
   private rows = 24;
   private cols = 80;
   private keyOverlay: boolean;
+  private disposed = false;
   private controller: SessionController | undefined;
   private readonly disposables: vscode.Disposable[] = [];
 
@@ -227,8 +228,14 @@ export class TerminalPanel {
     this.pushConfig();
   }
 
+  /** Session events (status on disconnect, async config loads) can arrive after the tab closed. */
   private post(message: HostToWebview): void {
-    void this.panel.webview.postMessage(message);
+    if (this.disposed) return;
+    try {
+      void this.panel.webview.postMessage(message).then(undefined, () => undefined);
+    } catch {
+      // The webview went away between the check and the call.
+    }
   }
 
   /** Appearance and keyboard follow the live settings; connection values stay as the tab was opened. */
@@ -285,6 +292,9 @@ export class TerminalPanel {
       case 'copy':
         void vscode.env.clipboard.writeText(msg.text);
         break;
+      case 'paste':
+        void vscode.env.clipboard.readText().then((text) => this.post({ type: 'paste', text }));
+        break;
       case 'printScreen':
         void vscode.commands.executeCommand('tn5250.printScreen');
         break;
@@ -305,6 +315,7 @@ export class TerminalPanel {
   }
 
   private dispose(): void {
+    this.disposed = true;
     TerminalPanel.open.delete(this);
     TerminalPanel.letters.delete(this.letter);
     if (TerminalPanel.active === this) TerminalPanel.setActive(undefined);

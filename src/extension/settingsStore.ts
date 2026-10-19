@@ -53,6 +53,8 @@ const DEFAULT_KEYS: Record<keyof TerminalSettings, string | undefined> = {
   watermarkOpacity: 'watermark.opacity',
   watermarkPosition: 'watermark.position',
   watermarkPadding: 'watermark.padding',
+  watermarkX: 'watermark.x',
+  watermarkY: 'watermark.y',
   watermarkOffsetX: 'watermark.offsetX',
   watermarkOffsetY: 'watermark.offsetY',
   colorGreen: 'colors.green',
@@ -142,7 +144,9 @@ export async function writeDefaults(values: TerminalSettings): Promise<void> {
 
 export function readSessions(): SessionOverrides[] {
   const stored = vscode.workspace.getConfiguration('tn5250').get<SessionOverrides[]>('sessions', []);
-  return stored.filter((s) => typeof s?.host === 'string' && s.host.trim());
+  // Keep sessions without a host yet ("Add Connection" creates one): the settings page
+  // addresses sessions by index and must see the new entry to select it.
+  return stored.filter((s) => typeof s?.host === 'string');
 }
 
 export async function writeSessions(sessions: SessionOverrides[]): Promise<void> {

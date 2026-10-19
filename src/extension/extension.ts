@@ -60,6 +60,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const openSession = (index: number): void => {
     const profile = resolvedSessions()[index];
     if (!profile) return;
+    if (!profile.host.trim()) {
+      SettingsPanel.show(context, output, index);
+      return;
+    }
     void context.globalState.update(LAST_SESSION_KEY, profile.name);
     TerminalPanel.create(context, output, profile);
   };

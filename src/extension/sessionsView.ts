@@ -8,7 +8,7 @@ export class SessionItem extends vscode.TreeItem {
     readonly index: number,
   ) {
     super(profile.name || profile.host, vscode.TreeItemCollapsibleState.None);
-    this.description = `${profile.host}:${profile.port}${profile.tls ? ' TLS' : ''} ${profile.screenSize}`;
+    this.description = profile.host ? `${profile.host}:${profile.port}${profile.tls ? ' TLS' : ''} ${profile.screenSize}` : 'no host yet - click to edit';
     this.tooltip = `${profile.host}:${profile.port}\n${profile.screenSize}, CCSID ${profile.codePage}${profile.deviceName ? `, device ${profile.deviceName}` : ''}`;
     this.tooltip = `Connect to IBM i (new tab)
 ${this.tooltip as string}`;
