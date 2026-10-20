@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Enhanced UI: the host's underline and column separators are drawn everywhere except inside boxed input fields. Before, Enhanced mode dropped them on all text, so underlined column headings (DSPATR(UL)) and protected input fields lost their underline.
+
 ## 0.1.2
 
 - SEU syntax colouring for RPG/RPGLE (fixed, free, fully free, embedded SQL), CL, DDS and DB2 SQL. The language comes from the source file name (QRPGLESRC, QCLLESRC, QDDSSRC, QSQLSRC ...) or the code itself; colours follow the 5250 colour settings, and the host's own colours (errors, reverse image) are left alone.
