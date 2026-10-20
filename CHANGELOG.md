@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Settings: User ID and Set Password… are always shown under IBM i signon information; Bypass signon only decides whether they are typed in automatically.
 - Enhanced UI: the host's underline and column separators are drawn everywhere except inside boxed input fields. Before, Enhanced mode dropped them on all text, so underlined column headings (DSPATR(UL)) and protected input fields lost their underline.
 
 ## 0.1.2
