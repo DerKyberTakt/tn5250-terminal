@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import type { HostToSettings, SettingsToHost } from '../shared/settingsProtocol';
-import { COLOR_KEYS, resolveSettings, type TerminalSettings } from '../shared/settings';
+import type { HostToSettings, SettingsAssets, SettingsToHost } from '../shared/settingsProtocol';
+import { COLOR_KEYS, copySessionAt, resolveSettings, type TerminalSettings } from '../shared/settings';
 import { importKmpInteractive } from './kmpCommand';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
 import { importFontFile, listSystemFonts } from './fonts';
@@ -85,6 +85,11 @@ export class SettingsPanel {
     const merged = { ...current, ...(patch ?? {}) };
     const extra = [defaults.fontFile, ...sessions.map((s) => s.fontFile ?? '')].filter(Boolean);
     const fonts = (await listSystemFonts(extra)).map((f) => ({ family: f.family, monospace: f.monospace }));
+    return { type: 'data', defaults, sessions, select: this.select, patch, fonts, ...(await this.assets(merged)) };
+  }
+
+  /** Watermark image and imported font of a profile, for the preview. */
+  private async assets(merged: TerminalSettings): Promise<SettingsAssets> {
     let watermarkImageData: string | undefined;
     if (merged.watermarkImage) {
       try {
@@ -99,11 +104,19 @@ export class SettingsPanel {
     const fontFace = merged.fontFile && merged.fontFamily
       ? { family: merged.fontFamily, url: this.panel.webview.asWebviewUri(vscode.Uri.file(merged.fontFile)).toString() }
       : undefined;
-    return { type: 'data', defaults, sessions, select: this.select, patch, fonts, watermarkImageData, fontFace };
+    return { watermarkImageData, fontFace };
   }
 
   private async onMessage(msg: SettingsToHost): Promise<void> {
     switch (msg.type) {
+      case 'select': {
+        this.select = msg.index;
+        const defaults = readDefaults();
+        const sessions = readSessions();
+        const current = msg.index < 0 ? defaults : resolveSettings(defaults, sessions[msg.index] ?? { host: '' });
+        void this.panel.webview.postMessage({ type: 'assets', select: msg.index, ...(await this.assets(current)) } satisfies HostToSettings);
+        break;
+      }
       case 'ready':
         this.push();
         break;
@@ -120,6 +133,15 @@ export class SettingsPanel {
         await writeSessions(sessions);
         this.select = sessions.length - 1;
         this.push();
+        break;
+      }
+      case 'copySession': {
+        const copied = copySessionAt(readSessions(), msg.index);
+        if (!copied) break;
+        await writeSessions(copied.sessions);
+        this.select = copied.index;
+        this.push();
+        void vscode.commands.executeCommand('tn5250.refreshSessions');
         break;
       }
       case 'removeSession': {

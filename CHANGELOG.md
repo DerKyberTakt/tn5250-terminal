@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Settings: Copy connection, a new connection with all the settings of the selected one.
+- Settings: the watermark preview shows the image (and the font preview the imported font) of the profile picked in the list, not only of the profile the page opened on; the position and offset sliders move it again.
 - Bypass signon and the user ID follow the settings page on the next connect of an open session (before, a session kept the values it was opened with).
 - Settings: User ID and Set Password… are always shown under IBM i signon information; Bypass signon only decides whether they are typed in automatically.
 - Enhanced UI: the host's underline and column separators are drawn everywhere except inside boxed input fields. Before, Enhanced mode dropped them on all text, so underlined column headings (DSPATR(UL)) and protected input fields lost their underline.
