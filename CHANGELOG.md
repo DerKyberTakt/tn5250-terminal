@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- After a window closes (F12 / Enter on a DDS WINDOW), the cursor lands in the first input field of the screen underneath instead of the top-left corner.
+- A full field-exit-required field no longer loses its last character: Field Exit, Field +/- and Erase EOF keep it, Backspace removes it, and typing more reports 0020 until the cursor moves. Pasting a value that exactly fills a field no longer wipes the next field.
+- End is End of Field (cursor after the last typed character), on the main keyboard and the keypad, as in ACS; Alt+End / Alt+keypad End erase input; Erase EOF moved to Ctrl+End. Imported .kmp files map `[eof]` to End of Field.
+- Keyboard settings page: a search box narrows the key and function list; the global settings search finds keys and functions too.
 - Settings: Copy connection, a new connection with all the settings of the selected one.
 - Settings: the watermark preview shows the image (and the font preview the imported font) of the profile picked in the list, not only of the profile the page opened on; the position and offset sliders move it again.
 - Bypass signon and the user ID follow the settings page on the next connect of an open session (before, a session kept the values it was opened with).
