@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Command attention keys (DDS CA03, CA12 ...) no longer send what was typed: the host's Start of Header command key bytes are honoured, so a program sees the same thing it sees from ACS (e.g. a 1 typed on a row and then F3 is discarded, not processed). Before, every function key returned the modified fields.
 - After a window closes (F12 / Enter on a DDS WINDOW), the cursor lands in the first input field of the screen underneath instead of the top-left corner.
 - A full field-exit-required field no longer loses its last character: Field Exit, Field +/- and Erase EOF keep it, Backspace removes it, and typing more reports 0020 until the cursor moves. Pasting a value that exactly fills a field no longer wipes the next field.
 - End is End of Field (cursor after the last typed character), on the main keyboard and the keypad, as in ACS; Alt+End / Alt+keypad End erase input; Erase EOF moved to Ctrl+End. Imported .kmp files map `[eof]` to End of Field.
