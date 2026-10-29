@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Back on a menu after F3/F12, the cursor is in the option field (the first input field) again, as in ACS. A format the host rewrites after Restore Screen (new Start of Header) no longer keeps the cursor where it was when the screen was saved, which left it one position in, or in the second field, and needed a Tab back.
+
 ## 0.1.3 - 2026-10-28
 
 - Command attention keys (DDS CA03, CA12 ...) no longer send what was typed: the host's Start of Header command key bytes are honoured, so a program sees the same thing it sees from ACS (e.g. a 1 typed on a row and then F3 is discarded, not processed). Before, every function key returned the modified fields.
