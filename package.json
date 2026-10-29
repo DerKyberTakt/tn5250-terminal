@@ -2,7 +2,7 @@
   "name": "tn5250-terminal",
   "displayName": "TN5250 Terminal for IBM i",
   "description": "5250 terminal emulator for IBM i (AS/400) that opens as a VS Code editor tab. Pure TypeScript TN5250 client, nothing else to install.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "DerKyberTakt",
   "license": "MIT",
   "private": true,

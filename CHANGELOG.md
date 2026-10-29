@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.3 - 2026-10-28
 
 - Command attention keys (DDS CA03, CA12 ...) no longer send what was typed: the host's Start of Header command key bytes are honoured, so a program sees the same thing it sees from ACS (e.g. a 1 typed on a row and then F3 is discarded, not processed). Before, every function key returned the modified fields.
 - After a window closes (F12 / Enter on a DDS WINDOW), the cursor lands in the first input field of the screen underneath instead of the top-left corner.
