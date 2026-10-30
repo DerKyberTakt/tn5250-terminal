@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Enhanced 5250 (new setting, off by default): the terminal answers the host's Query as an enhanced-interface display, as ACS does. DDS windows then arrive as GUI windows: the border is drawn by the terminal, what a window covers is remembered and comes back when the program removes the window (Remove GUI Window, Remove All GUI Constructs, Save/Restore Partial Screen). Without it a window drawn by a prompt program stays on a screen the program only repaints with PUTOVR, exactly as in Mocha.
+- Enhanced 5250 interface: the terminal answers the host's Query as an enhanced-interface display, as ACS does. DDS windows then arrive as GUI windows: the border is drawn by the terminal, what a window covers is remembered and comes back when the program removes the window (Remove GUI Window, Remove All GUI Constructs, Save/Restore Partial Screen). Before, a window drawn by a prompt program stayed on a screen the program only repainted with PUTOVR (PO05Z2 F4 prompts), exactly as in Mocha.
 - Back on a menu after F3/F12, the cursor is in the option field (the first input field) again, as in ACS. A format the host rewrites after Restore Screen (new Start of Header) no longer keeps the cursor where it was when the screen was saved, which left it one position in, or in the second field, and needed a Tab back.
 
 ## 0.1.3 - 2026-10-28
