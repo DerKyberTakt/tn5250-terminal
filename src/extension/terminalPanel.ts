@@ -264,6 +264,13 @@ export class TerminalPanel {
     const p = this.profile;
     if (!p || !TerminalPanel.history) return;
     if (status === 'connected') {
+      if (this.historyEntry && !this.historyEntry.end) {
+        // Connected again without a disconnect in between: the host refused the workstation
+        // name and the next one was tried. Same connection, same entry, new device name.
+        this.historyEntry = { ...this.historyEntry, deviceName: p.deviceName, tabTitle: this.title };
+        TerminalPanel.history.record(this.historyEntry);
+        return;
+      }
       const saved = resolvedSessions().some((s) => s.name === p.name && s.host === p.host);
       this.historyEntry = {
         id: `${Date.now().toString(36)}-${this.letter}`,
