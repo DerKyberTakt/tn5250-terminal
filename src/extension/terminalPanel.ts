@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { expandDeviceName } from '../shared/deviceName';
+import type { PcCommandKind } from '../shared/pcCommand';
 import type { HostToWebview, WebviewToHost } from '../shared/protocol';
 import { DEFAULT_OIA } from '../shared/protocol';
 import { SETTINGS_DEFAULTS, buildTitle, type TerminalSettings } from '../shared/settings';
@@ -8,6 +9,7 @@ import { signonUser, type HistoryEntry } from '../shared/history';
 import * as path from 'node:path';
 import { buildDemoScreen } from '../engine/demoScreen';
 import { HostConnection } from './connection';
+import { runPcCommand } from './pcShell';
 import { SessionController } from './sessionController';
 import { readDefaults, resolvedSessions } from './settingsStore';
 import { certPassphraseKey, passwordKey } from './secrets';
@@ -190,6 +192,8 @@ export class TerminalPanel {
         password: async () => (await context.secrets.get(passwordKey(profile.name, profile.host))) ?? (await context.secrets.get(passwordKey('', profile.host))),
         signon: () => resolvedSessions().find((s) => s.name === profile.name && s.host === profile.host) ?? profile,
         log: (message) => this.output.appendLine(`[${label}] ${message}`),
+        pcCommandPolicy: () => this.liveSettings().pcCommands,
+        pcCommand: (kind, decision, wait) => this.handlePcCommand(kind, decision, wait),
       }, (events) => new HostConnection(events));
     }
 
@@ -391,6 +395,28 @@ export class TerminalPanel {
   private pushDemoScreen(): void {
     this.post({ type: 'screen', screen: buildDemoScreen(this.rows, this.cols) });
     this.post({ type: 'oia', oia: { ...DEFAULT_OIA, message: `${this.rows}x${this.cols}` } });
+  }
+
+  /** STRPCCMD from the host: open the link or run the command, asking first when the policy says so. */
+  private async handlePcCommand(kind: PcCommandKind, decision: 'open' | 'run' | 'ask', wait: boolean): Promise<void> {
+    const label = this.titleText;
+    if (kind.kind === 'link') {
+      if (decision === 'ask') {
+        const pick = await vscode.window.showInformationMessage(`${label}: the host wants to open a link.\n\n${kind.url}`, { modal: true }, 'Open');
+        if (pick !== 'Open') return;
+      }
+      await vscode.env.openExternal(vscode.Uri.parse(kind.url));
+      vscode.window.setStatusBarMessage(`TN5250: opened ${kind.url}`, 6000);
+      return;
+    }
+    if (decision === 'ask') {
+      const pick = await vscode.window.showWarningMessage(`${label}: the host wants to run this command on your PC.\n\n${kind.command}`, { modal: true }, 'Run');
+      if (pick !== 'Run') {
+        this.output.appendLine(`[${label}] PC command not run: ${kind.command}`);
+        return;
+      }
+    }
+    await runPcCommand(kind.command, wait);
   }
 
   private onMessage(msg: WebviewToHost): void {

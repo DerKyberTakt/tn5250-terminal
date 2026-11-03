@@ -951,6 +951,17 @@
           "type": "boolean",
           "description": "TN5250: type-ahead. Set it on the TN5250 Settings page."
         },
+        "tn5250.behavior.pcCommands": {
+          "default": "links",
+          "type": "string",
+          "enum": [
+            "links",
+            "ask",
+            "all",
+            "off"
+          ],
+          "description": "TN5250: PC commands from the host (STRPCCMD). Set it on the TN5250 Settings page."
+        },
         "tn5250.behavior.alarm": {
           "default": true,
           "type": "boolean",

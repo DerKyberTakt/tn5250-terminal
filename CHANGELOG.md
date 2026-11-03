@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- PC commands from the host (STRPCCMD / PC Organizer): a host program that runs `STRPCCMD PCCMD('START http://...')` used to leave the terminal on the host's "Required PC program (PCO.EXE) is not active" screen. The terminal now recognises the request, opens http(s) links in the default browser and presses Enter for the host, so the program carries on without a flash of that screen. Other commands ask first (Run / Cancel) and run through the shell; PAUSE(*YES) waits for the command to finish. Setting `tn5250.behavior.pcCommands`: `links` (default), `ask`, `all`, `off`.
+- The screen no longer resizes itself back and forth when a side panel narrows the editor by just the wrong amount (Enhanced style, or a zoomed-in screen): the fitted screen never shows scrollbars, and the size is measured so scrollbars cannot change it. A zoomed-in screen scrolls from its top-left corner instead of being cut off on the left.
+
 ## 0.1.8 - 2026-11-04
 
 - The session icons of the side bar (grey, and green while connected) were missing from the packaged extension since 0.1.6: the packaging whitelist did not include them. No other change.

@@ -115,6 +115,7 @@ const DEFAULT_KEYS: Record<keyof TerminalSettings, string | undefined> = {
   typeAhead: 'behavior.typeAhead',
   alarm: 'behavior.alarm',
   keyClick: 'behavior.keyClick',
+  pcCommands: 'behavior.pcCommands',
   keymap: 'keyboard.keymap',
   keyWarningsIgnored: 'keyboard.warningsIgnored',
 };
