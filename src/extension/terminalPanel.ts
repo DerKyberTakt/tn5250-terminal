@@ -443,6 +443,9 @@ export class TerminalPanel {
       case 'scroll':
         this.controller?.scrollBar(msg.addr, msg.forward, msg.increment);
         break;
+      case 'mouse':
+        this.controller?.mouseEvent(msg.event, msg.row, msg.col);
+        break;
       case 'copy':
         void vscode.env.clipboard.writeText(msg.text);
         break;
