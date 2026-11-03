@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Settings that only take effect on a new connection (host, port, protocol, workstation ID, screen size, code page, timeouts, type-ahead, auto-reconnect, alarm) are marked on the settings page. Saving one of them while a terminal that uses it is open now asks: **Save & Reload** reconnects those tabs with the new values at once, **Save & Close** saves only. Before, a screen-size change needed a new tab, and a Default change did not reach a tab whose saved session overrode that field.
 - Keyboard: the ACS cursor and edit functions that were missing. Fast Cursor Up/Down/Left/Right (3 rows or columns per press, Ctrl+arrows), Tab Word / Backtab Word (Alt+Right / Alt+Left), Beginning of Field, Delete Word (Ctrl+Delete), Erase Field, Test Request (Ctrl+F12) and a Rule line on/off key (Ctrl+Home). Copy and Paste are now keymap actions (Ctrl+C / Ctrl+Insert, Ctrl+V / Shift+Insert as before), so Dup can be assigned to any key; it is unassigned by default, as in ACS. The `.kmp` import understands the standard ACS/HOD names for all of these (fastup, wordleft, bof, worddel, erasefld, test, field+, field-, erinp, rcdbacksp, instog, fieldexit, printps).
 
 ## 0.1.4 - 2026-11-02

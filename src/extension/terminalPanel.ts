@@ -107,7 +107,7 @@ export class TerminalPanel {
     private readonly panel: vscode.WebviewPanel,
     readonly profile: TerminalSettings | undefined,
     private readonly letter: string,
-    private readonly deviceTemplate: string,
+    private template: string,
   ) {
     TerminalPanel.open.add(this);
     this.keyOverlay = vscode.workspace.getConfiguration('tn5250').get<boolean>('debug.keyOverlay', false);
@@ -143,7 +143,7 @@ export class TerminalPanel {
             return undefined;
           }
         },
-        nextDeviceName: () => (this.deviceTemplate && /[*=]/.test(this.deviceTemplate) ? TerminalPanel.expandDevice(this.deviceTemplate) : undefined),
+        nextDeviceName: () => (this.template && /[*=]/.test(this.template) ? TerminalPanel.expandDevice(this.template) : undefined),
         password: async () => (await context.secrets.get(passwordKey(profile.name, profile.host))) ?? (await context.secrets.get(passwordKey('', profile.host))),
         signon: () => resolvedSessions().find((s) => s.name === profile.name && s.host === profile.host) ?? profile,
         log: (message) => this.output.appendLine(`[${label}] ${message}`),
@@ -202,6 +202,30 @@ export class TerminalPanel {
 
   disconnect(): void {
     this.controller?.disconnect();
+  }
+
+  /** The Workstation ID template this tab was opened with ('' = assigned by the host). */
+  get deviceTemplate(): string {
+    return this.template;
+  }
+
+  /**
+   * Connection settings saved while the tab is open (Save & Reload): the tab takes the new
+   * values and reconnects. The controller shares the profile object, so assigning onto it is
+   * enough; the workstation name is expanded again only when its template changed.
+   */
+  reload(profile: TerminalSettings): void {
+    if (!this.profile || !this.controller) return;
+    const template = profile.deviceName.trim();
+    const deviceName = template === this.template ? this.profile.deviceName : template ? TerminalPanel.expandDevice(template) : '';
+    this.template = template;
+    Object.assign(this.profile, { ...profile, deviceName });
+    this.rows = this.profile.screenSize === '27x132' ? 27 : 24;
+    this.cols = this.profile.screenSize === '27x132' ? 132 : 80;
+    this.disconnect();
+    this.refreshTitle();
+    this.pushConfig();
+    this.connect();
   }
 
   screenText(): string | undefined {

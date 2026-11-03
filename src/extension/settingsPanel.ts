@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { HostToSettings, SettingsAssets, SettingsToHost } from '../shared/settingsProtocol';
-import { COLOR_KEYS, copySessionAt, resolveSettings, type TerminalSettings } from '../shared/settings';
+import { COLOR_KEYS, copySessionAt, describeChange, reloadPlan, resolveSettings, type TerminalSettings } from '../shared/settings';
 import { importKmpInteractive } from './kmpCommand';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
 import { importFontFile, listSystemFonts } from './fonts';
@@ -120,13 +120,32 @@ export class SettingsPanel {
       case 'ready':
         this.push();
         break;
-      case 'save':
+      case 'save': {
+        // Changes that only apply on a new connection: offer to reconnect the open tabs that use them.
+        const changes = msg.connectionChanges ?? [];
+        const sessions = readSessions();
+        const open = [...TerminalPanel.open].flatMap((p) => (p.profile ? [{ tab: p, profile: p.profile, deviceTemplate: p.deviceTemplate }] : []));
+        const plan = changes.length ? reloadPlan(msg.target, msg.values, sessions, open, changes) : [];
+        let reload = false;
+        if (plan.length) {
+          const before = msg.target < 0 ? readDefaults() : resolveSettings(readDefaults(), sessions[msg.target] ?? { host: '' });
+          const pick = await vscode.window.showInformationMessage(
+            `${plan.length === 1 ? '1 open terminal uses' : `${plan.length} open terminals use`} settings that only take effect on a new connection.`,
+            { modal: true, detail: changes.map((k) => describeChange(k, before, msg.values)).join('\n') + '\n\nSave & Reload reconnects them now. Save & Close keeps them as they are until they reconnect.' },
+            'Save & Reload',
+            'Save & Close',
+          );
+          if (!pick) break; // cancelled: nothing saved, the page stays dirty
+          reload = pick === 'Save & Reload';
+        }
         if (msg.target < 0) await writeDefaults(msg.values);
         else await saveSession(msg.target, msg.values);
         this.select = msg.target;
         this.push();
-        void vscode.window.setStatusBarMessage('TN5250: settings saved', 2500);
+        if (reload) for (const { tab, profile } of plan) tab.reload(profile);
+        void vscode.window.setStatusBarMessage(reload ? 'TN5250: settings saved, terminals reloaded' : 'TN5250: settings saved', 2500);
         break;
+      }
       case 'addSession': {
         const sessions = readSessions();
         sessions.push({ host: '', name: 'New session' });
