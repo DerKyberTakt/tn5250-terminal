@@ -116,6 +116,7 @@ const DEFAULT_KEYS: Record<keyof TerminalSettings, string | undefined> = {
   alarm: 'behavior.alarm',
   keyClick: 'behavior.keyClick',
   pcCommands: 'behavior.pcCommands',
+  subfileScrollBar: 'display.subfileScrollBar',
   keymap: 'keyboard.keymap',
   keyWarningsIgnored: 'keyboard.warningsIgnored',
 };

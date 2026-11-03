@@ -440,6 +440,9 @@ export class TerminalPanel {
       case 'click':
         this.controller?.setCursor(msg.row, msg.col);
         break;
+      case 'scroll':
+        this.controller?.scrollBar(msg.addr, msg.forward, msg.increment);
+        break;
       case 'copy':
         void vscode.env.clipboard.writeText(msg.text);
         break;

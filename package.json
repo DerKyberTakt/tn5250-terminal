@@ -962,6 +962,11 @@
           ],
           "description": "TN5250: PC commands from the host (STRPCCMD). Set it on the TN5250 Settings page."
         },
+        "tn5250.display.subfileScrollBar": {
+          "default": false,
+          "type": "boolean",
+          "description": "TN5250: scroll bar on every subfile (More... / Bottom). Set it on the TN5250 Settings page."
+        },
         "tn5250.behavior.alarm": {
           "default": true,
           "type": "boolean",
