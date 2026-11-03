@@ -1,5 +1,7 @@
 # TN5250 Terminal for IBM i
 
+[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/DerKyberTakt.tn5250-terminal?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=DerKyberTakt.tn5250-terminal) [![Installs](https://img.shields.io/visual-studio-marketplace/i/DerKyberTakt.tn5250-terminal)](https://marketplace.visualstudio.com/items?itemName=DerKyberTakt.tn5250-terminal) [![Rating](https://img.shields.io/visual-studio-marketplace/r/DerKyberTakt.tn5250-terminal)](https://marketplace.visualstudio.com/items?itemName=DerKyberTakt.tn5250-terminal&ssr=false#review-details) [![CI](https://github.com/DerKyberTakt/tn5250-terminal/actions/workflows/ci.yml/badge.svg)](https://github.com/DerKyberTakt/tn5250-terminal/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A 5250 terminal emulator that lives in a **VS Code editor tab**. Connect to IBM i (AS/400, iSeries) systems next to your RPG, CL and SQL sources, with the keyboard and look of IBM i Access Client Solutions and nothing else to install.
 
 ## Screenshots
