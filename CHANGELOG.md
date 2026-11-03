@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-11-03
 
 - Entry field FCWs of the enhanced interface: continued entry fields (DDS CNTFLD) are edited as one field across their segments (typing, Insert, Delete, Backspace, Erase EOF, Field Exit, Dup) and go back to the host as one field; word wrap fields (WRDWRAP) keep words whole across lines and segments and drop their padding on the read; cursor progression (FLDCSRPRG) sends Tab and a filled field to the numbered field and Backtab back; highlighted entry fields (ENTFLDATR) change their attribute while the cursor is in them and can hide the cursor.
 - Selection fields (enhanced 5250 Define Selection Field): menu bars with their separator line, pull-downs, single choice fields and lists (radio buttons), multiple choice fields and lists (check boxes) and push buttons, laid out as the host defines them. Tab enters a field at its first choice, the arrows move the selection cursor between choices (Roll keys at the edges the host marks), Space and / select, Delete deselects, a typed mnemonic letter or number picks its choice, a click selects, and auto-enter / auto-select / per-choice AIDs send the field at once (push buttons). The host receives the choice number or one byte per choice, plus the scroll increment of a list's own scroll bar, in the format of the 5494 reference. The Enhanced style draws radio buttons, check boxes, push button frames, the selection cursor and the mnemonic underline; the Classic style shows the characters a character display shows.
