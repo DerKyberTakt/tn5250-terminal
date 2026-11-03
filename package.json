@@ -1715,7 +1715,7 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run test",
     "gen:keybindings": "node scripts/gen-keybindings.mjs",
-    "package": "npm run check && node esbuild.mjs --production && vsce package --no-dependencies",
+    "package": "npm run check && node esbuild.mjs --production && node scripts/check-package.mjs && vsce package --no-dependencies",
     "vscode:prepublish": "node esbuild.mjs --production"
   },
   "devDependencies": {
