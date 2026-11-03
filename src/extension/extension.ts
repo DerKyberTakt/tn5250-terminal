@@ -52,6 +52,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const sessionsView = vscode.window.createTreeView('tn5250.sessions', { treeDataProvider: sessions });
   sessions.attach(sessionsView);
   context.subscriptions.push(sessionsView);
+  // Every minute: the open history entries of connected tabs are marked alive, so an entry
+  // left behind by a crash ends at its last heartbeat instead of staying "open".
+  const heartbeat = setInterval(() => history.touchOpen([...TerminalPanel.open].flatMap((p) => (p.historyId ? [p.historyId] : []))), 60_000);
+  context.subscriptions.push({ dispose: () => clearInterval(heartbeat) });
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   status.command = 'tn5250.connectPrevious';
@@ -118,17 +122,17 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   register('tn5250.connectSession', (item: SessionItem) => {
     if (item?.profile) openSession(item.index);
-    sessions.refresh(); // rebuilt items drop the selection, so the row's hover actions do not stick
+    if (item) sessions.deselect(item); // so the row's hover actions do not stick after the click
   });
   register('tn5250.revealSession', (item: SessionItem) => {
     const tab = item?.latestTab;
     if (tab) tab.reveal();
     else if (item?.profile) openSession(item.index);
-    sessions.refresh();
+    if (item) sessions.deselect(item);
   });
   register('tn5250.revealTab', (item: TabItem) => {
     item?.panel.reveal();
-    sessions.refresh();
+    if (item) sessions.deselect(item);
   });
   register('tn5250.closeTab', (item: TabItem) => item?.panel.close());
   register('tn5250.reconnectTab', (item: TabItem) => {

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { describeEntry, formatDuration, pushHistory, type HistoryEntry } from '../shared/history';
+import { closeOrphans, describeEntry, formatDuration, pushHistory, touchEntries, type HistoryEntry } from '../shared/history';
 
 const HISTORY_KEY = 'tn5250.history';
 
@@ -8,7 +8,11 @@ export class HistoryStore {
   private readonly changed = new vscode.EventEmitter<void>();
   readonly onDidChange = this.changed.event;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) {
+    // Entries left open by a previous extension host end at their last heartbeat.
+    const list = this.list();
+    if (list.some((e) => !e.end)) void context.globalState.update(HISTORY_KEY, closeOrphans(list)).then(() => this.changed.fire());
+  }
 
   get enabled(): boolean {
     return vscode.workspace.getConfiguration('tn5250').get<boolean>('history.enabled', true);
@@ -26,6 +30,12 @@ export class HistoryStore {
   record(entry: HistoryEntry): void {
     if (!this.enabled) return;
     void this.context.globalState.update(HISTORY_KEY, pushHistory(this.list(), entry, this.limit)).then(() => this.changed.fire());
+  }
+
+  /** Heartbeat for the tabs still connected, so a crash does not leave their entries open for ever. */
+  touchOpen(ids: string[]): void {
+    if (!ids.length) return;
+    void this.context.globalState.update(HISTORY_KEY, touchEntries(this.list(), ids)).then(() => this.changed.fire());
   }
 
   remove(id: string): void {

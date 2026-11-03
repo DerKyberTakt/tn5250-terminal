@@ -38,13 +38,21 @@ export class TerminalPanel {
   private endReason: HistoryEntry['endedBy'] | undefined;
 
   private static changed(): void {
-    for (const f of TerminalPanel.onDidChange) f();
+    for (const f of TerminalPanel.onDidChange) {
+      try {
+        f();
+      } catch {
+        // one listener must not stop the others, or the tab that caused the change
+      }
+    }
   }
 
   private rows = 24;
   private cols = 80;
   private keyOverlay: boolean;
   private disposed = false;
+  /** The tab title, kept here because the WebviewPanel refuses every read once it is disposed. */
+  private titleText: string;
   private controller: SessionController | undefined;
   private readonly disposables: vscode.Disposable[] = [];
 
@@ -137,6 +145,7 @@ export class TerminalPanel {
     private readonly letter: string,
     private template: string,
   ) {
+    this.titleText = panel.title;
     TerminalPanel.open.add(this);
     queueMicrotask(() => TerminalPanel.changed());
     this.keyOverlay = vscode.workspace.getConfiguration('tn5250').get<boolean>('debug.keyOverlay', false);
@@ -200,7 +209,12 @@ export class TerminalPanel {
   }
 
   get title(): string {
-    return this.panel.title;
+    return this.titleText;
+  }
+
+  /** The id of this tab's running history entry, for the heartbeat that marks it alive. */
+  get historyId(): string | undefined {
+    return this.historyEntry?.id;
   }
 
   get sessionLetter(): string {
@@ -210,7 +224,8 @@ export class TerminalPanel {
   private refreshTitle(): void {
     if (!this.profile) return;
     const title = buildTitle(this.liveSettings(), this.letter);
-    if (title === this.panel.title) return;
+    if (title === this.titleText) return;
+    this.titleText = title;
     this.panel.title = title;
     TerminalPanel.changed();
   }
@@ -228,7 +243,7 @@ export class TerminalPanel {
   }
 
   get connected(): boolean {
-    return this.controller?.connected ?? false;
+    return !this.disposed && (this.controller?.connected ?? false);
   }
 
   connect(): void {
@@ -420,17 +435,30 @@ export class TerminalPanel {
     }
   }
 
+  /**
+   * The editor tab is gone (closed by the user, or VS Code shut the window). The WebviewPanel
+   * is already disposed here, so nothing below may read it; and the bookkeeping must run
+   * whatever else fails, or the tab stays listed as open and its connection stays up.
+   */
   private dispose(): void {
     this.disposed = true;
-    if (this.historyEntry && !this.historyEntry.end) {
-      this.endReason = 'closed';
-      this.recordHistory('disconnected', 'tab closed', false);
-    }
     TerminalPanel.open.delete(this);
     TerminalPanel.letters.delete(this.letter);
-    TerminalPanel.changed();
-    if (TerminalPanel.active === this) TerminalPanel.setActive(undefined);
-    this.controller?.dispose();
+    try {
+      if (this.historyEntry && !this.historyEntry.end) {
+        this.endReason = 'closed';
+        this.recordHistory('disconnected', 'tab closed', false);
+      }
+    } catch (err) {
+      this.output.appendLine(`history not recorded: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    try {
+      this.controller?.dispose();
+    } catch (err) {
+      this.output.appendLine(`connection not closed cleanly: ${err instanceof Error ? err.message : String(err)}`);
+    }
     for (const d of this.disposables.splice(0)) d.dispose();
+    if (TerminalPanel.active === this) TerminalPanel.setActive(undefined);
+    TerminalPanel.changed();
   }
 }

@@ -21,6 +21,7 @@ export class SessionItem extends vscode.TreeItem {
     this.tooltip = tabs.length ? `Click: show its tab (the plug icon opens another)\n${details}` : `Click: connect (new tab)\n${details}`;
     this.iconPath = live ? icons.on : icons.off;
     this.contextValue = tabs.length ? 'session-open' : 'session';
+    this.id = `session:${profile.name}@${profile.host}:${index}`;
     this.command = tabs.length ? { command: 'tn5250.revealSession', title: 'Show', arguments: [this] } : { command: 'tn5250.connectSession', title: 'Connect', arguments: [this] };
   }
 
@@ -38,6 +39,7 @@ export class TabItem extends vscode.TreeItem {
     this.tooltip = `${panel.title}\n${panel.connected ? 'Connected' : 'Disconnected'}${panel.profile?.deviceName ? `, device ${panel.profile.deviceName}` : ''}\nClick: show this tab`;
     this.iconPath = new vscode.ThemeIcon(panel.connected ? 'window' : 'debug-disconnect');
     this.contextValue = panel.connected ? 'tab' : 'tab-off';
+    this.id = `tab:${panel.sessionLetter}`;
     this.command = { command: 'tn5250.revealTab', title: 'Show', arguments: [this] };
   }
 }
@@ -49,6 +51,7 @@ export class GroupItem extends vscode.TreeItem {
     this.description = `${tabs.length}`;
     this.iconPath = new vscode.ThemeIcon('folder');
     this.contextValue = 'group';
+    this.id = 'group:adhoc';
   }
 }
 
@@ -61,6 +64,9 @@ export class SessionsProvider implements vscode.TreeDataProvider<SessionNode> {
   private readonly icons: { on: Icon; off: Icon };
   private view: vscode.TreeView<SessionNode> | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  /** The item whose row was just clicked: it gets a fresh id on the next build, so VS Code drops its selection. */
+  private bumped: string | undefined;
+  private nonce = 0;
 
   constructor(context: vscode.ExtensionContext) {
     const media = (name: string): vscode.Uri => vscode.Uri.joinPath(context.extensionUri, 'media', name);
@@ -79,6 +85,16 @@ export class SessionsProvider implements vscode.TreeDataProvider<SessionNode> {
   attach(view: vscode.TreeView<SessionNode>): void {
     this.view = view;
     this.updateBadge();
+  }
+
+  /**
+   * Drops the selection of a clicked row. VS Code keeps selection by item id across a refresh,
+   * and a selected row keeps its inline actions visible; a new id makes it a new row.
+   */
+  deselect(item: vscode.TreeItem): void {
+    this.bumped = item.id;
+    this.nonce++;
+    this.refresh();
   }
 
   /** Refreshes a little later: tab events come in bursts (status + title + active). */
@@ -103,8 +119,8 @@ export class SessionsProvider implements vscode.TreeDataProvider<SessionNode> {
   }
 
   getChildren(element?: SessionNode): SessionNode[] {
-    if (element instanceof SessionItem) return element.tabs.map((p) => new TabItem(p));
-    if (element instanceof GroupItem) return element.tabs.map((p) => new TabItem(p));
+    if (element instanceof SessionItem) return element.tabs.map((p) => this.bump(new TabItem(p)));
+    if (element instanceof GroupItem) return element.tabs.map((p) => this.bump(new TabItem(p)));
     if (element) return [];
     const open = [...TerminalPanel.open].filter((p) => p.profile);
     const claimed = new Set<TerminalPanel>();
@@ -120,6 +136,12 @@ export class SessionsProvider implements vscode.TreeDataProvider<SessionNode> {
     const rank = (s: SessionItem): number => (s.tabs.some((t) => t.connected) ? 0 : s.tabs.length ? 1 : 2);
     const sorted = items.map((s, i) => ({ s, i })).sort((a, b) => rank(a.s) - rank(b.s) || a.i - b.i).map((x) => x.s);
     const adhoc = open.filter((t) => !claimed.has(t));
-    return adhoc.length ? [...sorted, new GroupItem(adhoc)] : sorted;
+    const roots: SessionNode[] = adhoc.length ? [...sorted, new GroupItem(adhoc)] : sorted;
+    return roots.map((r) => this.bump(r));
+  }
+
+  private bump<T extends SessionNode>(item: T): T {
+    if (this.bumped && item.id === this.bumped) item.id = `${item.id}#${this.nonce}`;
+    return item;
   }
 }
