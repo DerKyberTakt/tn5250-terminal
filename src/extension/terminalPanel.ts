@@ -167,6 +167,9 @@ export class TerminalPanel {
         status: (status, detail, info) => {
           this.post({ type: 'status', status, detail, info });
           this.output.appendLine(`[${label}] ${status}: ${detail}`);
+          // The host may have refused the workstation name and the next one was tried: the
+          // tab title shows the name the host accepted.
+          if (status === 'connected') this.refreshTitle();
           TerminalPanel.onActiveChanged?.();
           TerminalPanel.changed();
           this.recordHistory(status, detail, info.manual === true);

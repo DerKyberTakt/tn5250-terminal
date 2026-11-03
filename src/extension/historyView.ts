@@ -52,11 +52,11 @@ export class HistoryItem extends vscode.TreeItem {
     super(entry.sessionName || entry.host, vscode.TreeItemCollapsibleState.None);
     this.description = describeEntry(entry);
     this.iconPath = new vscode.ThemeIcon(entry.end ? 'history' : 'window');
-    this.contextValue = 'history';
+    this.contextValue = entry.end ? 'history' : 'history-open'; // no "Connect again" while it is open
     const md = new vscode.MarkdownString();
     md.appendMarkdown(`**${entry.sessionName || entry.host}**\n\n`);
     for (const [k, v] of detailRows(entry)) md.appendMarkdown(`${k}: ${v}  \n`);
-    md.appendMarkdown('\nClick twice for details and actions.');
+    md.appendMarkdown(entry.end ? '\nClick twice for details and actions.' : '\nStill open: use its tab. Click twice for details.');
     this.tooltip = md;
     this.command = { command: 'tn5250.historyClick', title: 'Details', arguments: [this] };
   }

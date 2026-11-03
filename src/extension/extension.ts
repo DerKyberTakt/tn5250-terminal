@@ -193,6 +193,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const historyConnect = (item: HistoryItem | undefined): void => {
     const e = item?.entry;
     if (!e) return;
+    if (!e.end) {
+      void vscode.window.setStatusBarMessage('TN5250: that connection is still open; use its tab', 3000);
+      return;
+    }
     const index = resolvedSessions().findIndex((s) => e.sessionName && s.name === e.sessionName && s.host === e.host);
     if (index >= 0) openSession(index);
     else TerminalPanel.create(context, output, resolveSettings(readDefaults(), { host: e.host, port: e.port, tls: e.tls, name: '', screenSize: e.screenSize as '24x80' | '27x132' }));
@@ -203,7 +207,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const items: Pick[] = [
       ...detailRows(e).map(([label, description]) => ({ label, description })),
       { label: '', kind: vscode.QuickPickItemKind.Separator },
-      { label: '$(plug) Connect again', act: 'connect' as const },
+      ...(e.end ? [{ label: '$(plug) Connect again', act: 'connect' as const }] : []),
       { label: '$(copy) Copy device name', act: 'copy' as const, description: e.deviceName || undefined },
       { label: '$(trash) Remove entry', act: 'remove' as const },
     ];

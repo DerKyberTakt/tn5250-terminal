@@ -362,12 +362,12 @@
         },
         {
           "command": "tn5250.historyDetails",
-          "when": "view == tn5250.history && viewItem == history",
+          "when": "view == tn5250.history && viewItem =~ /^history/",
           "group": "inline@2"
         },
         {
           "command": "tn5250.historyRemove",
-          "when": "view == tn5250.history && viewItem == history",
+          "when": "view == tn5250.history && viewItem =~ /^history/",
           "group": "inline@3"
         }
       ]
