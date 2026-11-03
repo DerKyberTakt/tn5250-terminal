@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { HostToSettings, SettingsAssets, SettingsToHost } from '../shared/settingsProtocol';
 import { COLOR_KEYS, copySessionAt, describeChange, reloadPlan, resolveSettings, type TerminalSettings } from '../shared/settings';
-import { importKmpInteractive } from './kmpCommand';
+import { pickKmp } from './kmpCommand';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
 import { importFontFile, listSystemFonts } from './fonts';
 import * as path from 'node:path';
@@ -52,8 +52,10 @@ export class SettingsPanel {
 <body><div id="app"></div><script nonce="${n}" src="${script.toString()}"></script></body></html>`;
 
     panel.webview.onDidReceiveMessage((msg: SettingsToHost) => void this.onMessage(msg), undefined, context.subscriptions);
+    TerminalPanel.onDidChange.add(this.sendOpenTabs);
     panel.onDidDispose(() => {
       this.disposed = true;
+      TerminalPanel.onDidChange.delete(this.sendOpenTabs);
       if (SettingsPanel.current === this) SettingsPanel.current = undefined;
     });
     vscode.workspace.onDidChangeConfiguration(
@@ -70,13 +72,25 @@ export class SettingsPanel {
   private push(patch?: Partial<TerminalSettings>): void {
     void this.buildData(patch).then((msg) => {
       if (this.disposed) return;
-      try {
-        void this.panel.webview.postMessage(msg).then(undefined, () => undefined);
-      } catch {
-        // closed while the data was being built
-      }
+      this.send(msg);
+      this.sendOpenTabs();
     });
   }
+
+  private send(msg: HostToSettings): void {
+    try {
+      void this.panel.webview.postMessage(msg).then(undefined, () => undefined);
+    } catch {
+      // closed while the message was being built
+    }
+  }
+
+  /** The open terminal tabs with a session, so the page can warn which ones a save would reload. */
+  private readonly sendOpenTabs = (): void => {
+    if (this.disposed) return;
+    const tabs = [...TerminalPanel.open].flatMap((p) => (p.profile ? [{ title: p.title, profile: p.profile, deviceTemplate: p.deviceTemplate }] : []));
+    this.send({ type: 'openTabs', tabs });
+  };
 
   private async buildData(patch?: Partial<TerminalSettings>): Promise<HostToSettings> {
     const defaults = readDefaults();
@@ -129,12 +143,16 @@ export class SettingsPanel {
         let reload = false;
         if (plan.length) {
           const before = msg.target < 0 ? readDefaults() : resolveSettings(readDefaults(), sessions[msg.target] ?? { host: '' });
-          const pick = await vscode.window.showInformationMessage(
-            `${plan.length === 1 ? '1 open terminal uses' : `${plan.length} open terminals use`} settings that only take effect on a new connection.`,
-            { modal: true, detail: changes.map((k) => describeChange(k, before, msg.values)).join('\n') + '\n\nSave & Reload reconnects them now. Save & Close keeps them as they are until they reconnect.' },
-            'Save & Reload',
-            'Save & Close',
-          );
+          const detail = [
+            'Changes:',
+            ...changes.map((k) => `  ${describeChange(k, before, msg.values)}`),
+            '',
+            `Open tab${plan.length === 1 ? '' : 's'} that will reload:`,
+            ...plan.map(({ tab, profile }) => `  ${tab.title} (${profile.name || profile.host})`),
+            '',
+            'Save & Reload reconnects them now. Apply & Continue saves and leaves them running until they reconnect.',
+          ].join('\n');
+          const pick = await vscode.window.showInformationMessage(plan.length === 1 ? 'Reload the open tab?' : `Reload the ${plan.length} open tabs?`, { modal: true, detail }, 'Save & Reload', 'Apply & Continue');
           if (!pick) break; // cancelled: nothing saved, the page stays dirty
           reload = pick === 'Save & Reload';
         }
@@ -143,7 +161,7 @@ export class SettingsPanel {
         this.select = msg.target;
         this.push();
         if (reload) for (const { tab, profile } of plan) tab.reload(profile);
-        void vscode.window.setStatusBarMessage(reload ? 'TN5250: settings saved, terminals reloaded' : 'TN5250: settings saved', 2500);
+        void vscode.window.setStatusBarMessage(reload ? 'TN5250: settings saved, tabs reloaded' : plan.length ? 'TN5250: settings applied' : 'TN5250: settings saved', 2500);
         break;
       }
       case 'addSession': {
@@ -181,11 +199,12 @@ export class SettingsPanel {
       case 'setPassword':
         await setPasswordInteractive(this.context, msg.target);
         break;
-      case 'importKmp':
-        await importKmpInteractive(msg.target);
-        this.select = msg.target;
-        this.push();
+      case 'importKmp': {
+        // The page merges the keys into its unsaved edits; nothing is written until Save.
+        const result = await pickKmp();
+        if (result) this.send({ type: 'kmp', keymap: result.keymap, skipped: result.skipped.length });
         break;
+      }
       case 'browseFile': {
         const pem = msg.key === 'tlsClientKey';
         const picked = await vscode.window.showOpenDialog({

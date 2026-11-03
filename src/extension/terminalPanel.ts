@@ -27,6 +27,12 @@ export class TerminalPanel {
   static readonly viewType = 'tn5250.terminal';
   static active: TerminalPanel | undefined;
   static onActiveChanged: (() => void) | undefined;
+  /** Told when a tab opens, closes, connects, disconnects or changes its title. */
+  static readonly onDidChange = new Set<() => void>();
+
+  private static changed(): void {
+    for (const f of TerminalPanel.onDidChange) f();
+  }
 
   private rows = 24;
   private cols = 80;
@@ -110,6 +116,7 @@ export class TerminalPanel {
     private template: string,
   ) {
     TerminalPanel.open.add(this);
+    queueMicrotask(() => TerminalPanel.changed());
     this.keyOverlay = vscode.workspace.getConfiguration('tn5250').get<boolean>('debug.keyOverlay', false);
     panel.webview.options = {
       enableScripts: true,
@@ -130,6 +137,7 @@ export class TerminalPanel {
           this.post({ type: 'status', status, detail, info });
           this.output.appendLine(`[${label}] ${status}: ${detail}`);
           TerminalPanel.onActiveChanged?.();
+          TerminalPanel.changed();
         },
         alarm: () => this.post({ type: 'alarm' }),
         clientAuth: async () => {
@@ -177,7 +185,11 @@ export class TerminalPanel {
   }
 
   private refreshTitle(): void {
-    if (this.profile) this.panel.title = buildTitle(this.liveSettings(), this.letter);
+    if (!this.profile) return;
+    const title = buildTitle(this.liveSettings(), this.letter);
+    if (title === this.panel.title) return;
+    this.panel.title = title;
+    TerminalPanel.changed();
   }
 
   /** The profile's connection values with the live appearance/behavior settings. */
@@ -272,7 +284,7 @@ export class TerminalPanel {
       const fontFace = settings.fontFile && settings.fontFamily
         ? { family: settings.fontFamily, url: this.panel.webview.asWebviewUri(vscode.Uri.file(settings.fontFile)).toString() }
         : undefined;
-      this.post({ type: 'config', config: { settings, keyOverlay: this.keyOverlay, watermarkImageData, fontFace } });
+      this.post({ type: 'config', config: { settings, keyOverlay: this.keyOverlay, host: 'vscode', watermarkImageData, fontFace } });
     });
   }
 
@@ -350,6 +362,7 @@ export class TerminalPanel {
     this.disposed = true;
     TerminalPanel.open.delete(this);
     TerminalPanel.letters.delete(this.letter);
+    TerminalPanel.changed();
     if (TerminalPanel.active === this) TerminalPanel.setActive(undefined);
     this.controller?.dispose();
     for (const d of this.disposables.splice(0)) d.dispose();
