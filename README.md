@@ -2,6 +2,20 @@
 
 A 5250 terminal emulator that lives in a **VS Code editor tab**. Connect to IBM i (AS/400, iSeries) systems next to your RPG, CL and SQL sources, with the keyboard and look of IBM i Access Client Solutions and nothing else to install.
 
+## Screenshots
+
+Sign On on PUB400 in the Enhanced look, with the watermark and status line:
+
+![Sign On screen on PUB400](docs/pub400-loginscreen.png)
+
+SEU in 27x132 with syntax colouring and function keys drawn as buttons:
+
+![SEU with syntax colouring](docs/pub400-pdm-syntax-highlighting.png)
+
+The Keyboard settings page with the visual keyboard:
+
+![Keyboard settings page](docs/pub400-keymap.png)
+
 ## Highlights
 
 - **Zero installs.** A pure TypeScript TN5250 client running inside VS Code. No Java, no Node runtime, no packages on the IBM i.
