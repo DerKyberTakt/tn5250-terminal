@@ -4,3 +4,6 @@ dist/
 coverage/
 captures/
 .claude/
+
+# session traces and packages are never committed
+tn5250-trace-*.json
