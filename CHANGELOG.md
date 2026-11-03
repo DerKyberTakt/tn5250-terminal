@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keyboard: the ACS cursor and edit functions that were missing. Fast Cursor Up/Down/Left/Right (3 rows or columns per press, Ctrl+arrows), Tab Word / Backtab Word (Alt+Right / Alt+Left), Beginning of Field, Delete Word (Ctrl+Delete), Erase Field, Test Request (Ctrl+F12) and a Rule line on/off key (Ctrl+Home). Copy and Paste are now keymap actions (Ctrl+C / Ctrl+Insert, Ctrl+V / Shift+Insert as before), so Dup can be assigned to any key; it is unassigned by default, as in ACS. The `.kmp` import understands the standard ACS/HOD names for all of these (fastup, wordleft, bof, worddel, erasefld, test, field+, field-, erinp, rcdbacksp, instog, fieldexit, printps).
+
 ## 0.1.4 - 2026-11-02
 
 - Right Ctrl = Enter and Left Ctrl = Reset work (the default ACS layout), and a Control key assigned on the Keyboard settings page fires. Before, a modifier pressed on its own was handed back to the editor before the keymap was consulted, so Right Ctrl did nothing. The key overlay (TN5250: Toggle Key Debug) now shows `ControlRight -> enter`.

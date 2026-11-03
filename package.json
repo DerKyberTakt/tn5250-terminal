@@ -1450,6 +1450,21 @@
         "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
       },
       {
+        "key": "alt+left",
+        "command": "tn5250.shadowKey",
+        "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
+      },
+      {
+        "key": "alt+right",
+        "command": "tn5250.shadowKey",
+        "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
+      },
+      {
+        "key": "ctrl+delete",
+        "command": "tn5250.shadowKey",
+        "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
+      },
+      {
         "key": "ctrl+right",
         "command": "tn5250.shadowKey",
         "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
