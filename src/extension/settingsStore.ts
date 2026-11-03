@@ -116,6 +116,7 @@ const DEFAULT_KEYS: Record<keyof TerminalSettings, string | undefined> = {
   alarm: 'behavior.alarm',
   keyClick: 'behavior.keyClick',
   keymap: 'keyboard.keymap',
+  keyWarningsIgnored: 'keyboard.warningsIgnored',
 };
 
 export function readDefaults(): TerminalSettings {

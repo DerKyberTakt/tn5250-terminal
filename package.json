@@ -836,6 +836,14 @@
           "type": "boolean",
           "description": "TN5250: key click. Set it on the TN5250 Settings page."
         },
+        "tn5250.keyboard.warningsIgnored": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Keyboard functions whose 'no key for ...' warning on the Keyboard settings page was dismissed with Ignore. Cleared for a function when it gets a key again, and entirely when a .kmp file is imported."
+        },
         "tn5250.keyboard.keymap": {
           "default": {},
           "type": "object",
