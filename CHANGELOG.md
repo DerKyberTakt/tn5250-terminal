@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8 - 2026-11-04
+
+- The session icons of the side bar (grey, and green while connected) were missing from the packaged extension since 0.1.6: the packaging whitelist did not include them. No other change.
+
 ## 0.1.7 - 2026-11-03
 
 - README only: screenshots, corrected keyboard and status sections, working Marketplace badges. No code changes since 0.1.6, which was withdrawn from the Marketplace because its page could not be updated in place.

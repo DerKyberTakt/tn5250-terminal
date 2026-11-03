@@ -1,7 +1,7 @@
 **
 !dist/**
 !media/icon.png
-!media/sidebar.svg
+!media/*.svg
 !LICENSE
 !README.md
 !CHANGELOG.md
