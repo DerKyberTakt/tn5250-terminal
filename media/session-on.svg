@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <defs>
+    <filter id="g" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.4"/>
+    </filter>
+  </defs>
+  <rect x="1.5" y="2.5" width="13" height="10" rx="1.5" fill="none" stroke="#3fd16b" stroke-width="1.6" filter="url(#g)" opacity="0.9"/>
+  <rect x="1.5" y="2.5" width="13" height="10" rx="1.5" fill="none" stroke="#5be07f" stroke-width="1.1"/>
+  <path d="M4 5.5l2.5 2L4 9.5" fill="none" stroke="#5be07f" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M7.5 9.5h4" stroke="#5be07f" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M5 14h6" stroke="#5be07f" stroke-width="1.1" stroke-linecap="round"/>
+</svg>

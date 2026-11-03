@@ -141,6 +141,28 @@
         "icon": "$(empty-window)"
       },
       {
+        "command": "tn5250.revealSession",
+        "title": "Show Tab",
+        "category": "TN5250"
+      },
+      {
+        "command": "tn5250.revealTab",
+        "title": "Show Tab",
+        "category": "TN5250"
+      },
+      {
+        "command": "tn5250.closeTab",
+        "title": "Close Tab",
+        "category": "TN5250",
+        "icon": "$(close)"
+      },
+      {
+        "command": "tn5250.reconnectTab",
+        "title": "Reconnect Tab",
+        "category": "TN5250",
+        "icon": "$(debug-restart)"
+      },
+      {
         "command": "tn5250.disconnectAll",
         "title": "Disconnect All",
         "category": "TN5250"
@@ -165,6 +187,22 @@
         },
         {
           "command": "tn5250.connectSession",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.revealSession",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.revealTab",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.closeTab",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.reconnectTab",
           "when": "false"
         },
         {
@@ -239,23 +277,33 @@
       "view/item/context": [
         {
           "command": "tn5250.connectSession",
-          "when": "view == tn5250.sessions && viewItem == session",
+          "when": "view == tn5250.sessions && viewItem =~ /^session/",
           "group": "inline@1"
         },
         {
           "command": "tn5250.editSession",
-          "when": "view == tn5250.sessions && viewItem == session",
+          "when": "view == tn5250.sessions && viewItem =~ /^session/",
           "group": "inline@2"
         },
         {
           "command": "tn5250.duplicateSession",
-          "when": "view == tn5250.sessions && viewItem == session",
+          "when": "view == tn5250.sessions && viewItem =~ /^session/",
           "group": "inline@2"
         },
         {
           "command": "tn5250.removeSession",
-          "when": "view == tn5250.sessions && viewItem == session",
+          "when": "view == tn5250.sessions && viewItem =~ /^session/",
           "group": "inline@3"
+        },
+        {
+          "command": "tn5250.reconnectTab",
+          "when": "view == tn5250.sessions && viewItem == tab-off",
+          "group": "inline@1"
+        },
+        {
+          "command": "tn5250.closeTab",
+          "when": "view == tn5250.sessions && viewItem =~ /^tab/",
+          "group": "inline@2"
         }
       ]
     },

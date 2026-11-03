@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { TerminalPanel } from './terminalPanel';
 import { SettingsPanel } from './settingsPanel';
-import { SessionItem, SessionsProvider } from './sessionsView';
+import { SessionItem, SessionsProvider, TabItem } from './sessionsView';
 import { readDefaults, readSessions, removeSessionAt, resolvedSessions, writeSessions } from './settingsStore';
 import { importKmpInteractive } from './kmpCommand';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
@@ -41,7 +41,9 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(output);
 
   const sessions = new SessionsProvider(context);
-  context.subscriptions.push(vscode.window.registerTreeDataProvider('tn5250.sessions', sessions));
+  const sessionsView = vscode.window.createTreeView('tn5250.sessions', { treeDataProvider: sessions });
+  sessions.attach(sessionsView);
+  context.subscriptions.push(sessionsView);
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   status.command = 'tn5250.connectPrevious';
@@ -108,6 +110,22 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   register('tn5250.connectSession', (item: SessionItem) => {
     if (item?.profile) openSession(item.index);
+    sessions.refresh(); // rebuilt items drop the selection, so the row's hover actions do not stick
+  });
+  register('tn5250.revealSession', (item: SessionItem) => {
+    const tab = item?.latestTab;
+    if (tab) tab.reveal();
+    else if (item?.profile) openSession(item.index);
+    sessions.refresh();
+  });
+  register('tn5250.revealTab', (item: TabItem) => {
+    item?.panel.reveal();
+    sessions.refresh();
+  });
+  register('tn5250.closeTab', (item: TabItem) => item?.panel.close());
+  register('tn5250.reconnectTab', (item: TabItem) => {
+    item?.panel.connect();
+    item?.panel.reveal();
   });
   register('tn5250.editSession', (item: SessionItem) => SettingsPanel.show(context, output, item?.index ?? -1));
   register('tn5250.duplicateSession', async (item: SessionItem) => {

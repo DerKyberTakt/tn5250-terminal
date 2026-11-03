@@ -104,7 +104,22 @@ export class TerminalPanel {
 
   private static setActive(panel: TerminalPanel | undefined): void {
     TerminalPanel.active = panel;
+    if (panel) panel.activatedAt = Date.now();
     TerminalPanel.onActiveChanged?.();
+    TerminalPanel.changed();
+  }
+
+  /** When this tab was last shown (the side bar reveals a session's most recent tab). */
+  activatedAt = 0;
+
+  /** Brings the tab to the front. */
+  reveal(): void {
+    this.panel.reveal();
+  }
+
+  /** Closes the tab (same as closing it from its editor tab). */
+  close(): void {
+    this.panel.dispose();
   }
 
   private constructor(
