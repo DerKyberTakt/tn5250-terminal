@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7 - 2026-11-03
+
+- README only: screenshots, corrected keyboard and status sections, working Marketplace badges. No code changes since 0.1.6, which was withdrawn from the Marketplace because its page could not be updated in place.
+
 ## 0.1.6 - 2026-11-03
 
 - Keyboard settings page: a visual keyboard (main block with an F13-F24 row, navigation keys and a keypad with tall + and Enter) above the search. The search boxes have a clear (x) that stays while there is text. Keys light up as you press them, a green dot marks the keys that have a function (hover lists them) and a click on a key lists the functions bound to it. While Assign is active, typing a key or combination assigns it at once as before; clicking the keys on the picture builds the combination in the key bar underneath, where Save keybind assigns it and Cancel leaves Assign (keys typed while something is latched add to the picture; the Esc cap clears it). A letter, digit or symbol without Ctrl or Alt is refused, since the terminal types it. The key bar also reports what just happened (assigned, moved from another function with Undo, unassigned, restored, cancelled). The picture wraps and then shrinks with the page instead of squashing the keys.
