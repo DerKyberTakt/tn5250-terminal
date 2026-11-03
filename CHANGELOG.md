@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 - 2026-11-03
 
 - Settings that only take effect on a new connection (host, port, protocol, workstation ID, screen size, code page, timeouts, type-ahead, auto-reconnect, alarm) are marked on the settings page. Saving one of them while a terminal that uses it is open now asks: **Save & Reload** reconnects those tabs with the new values at once, **Save & Close** saves only. Before, a screen-size change needed a new tab, and a Default change did not reach a tab whose saved session overrode that field.
 - Keyboard settings page: Assign takes key combinations with Ctrl (Ctrl+Shift+E), and a modifier on its own (Right Ctrl) when it is released; Esc cancels. A key taken from another function says so, with Undo; a function whose ACS key is gone (Reset without Left Ctrl) is flagged at the top with a Restore link, and its ACS default is shown greyed in the list. Import and Reset moved to the top of the page with explanations; the .kmp picker opens in the ACS keyboard-map folder (Documents\IBM\iAccessClient\Emulator) and the import lands in the form, saved with the rest.
