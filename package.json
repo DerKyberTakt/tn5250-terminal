@@ -1733,5 +1733,9 @@
     "url": "https://github.com/DerKyberTakt/tn5250-terminal/issues"
   },
   "homepage": "https://github.com/DerKyberTakt/tn5250-terminal#readme",
-  "icon": "media/icon.png"
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#0b1a2b",
+    "theme": "dark"
+  }
 }
