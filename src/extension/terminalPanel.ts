@@ -4,6 +4,7 @@ import { expandDeviceName } from '../shared/deviceName';
 import type { HostToWebview, WebviewToHost } from '../shared/protocol';
 import { DEFAULT_OIA } from '../shared/protocol';
 import { SETTINGS_DEFAULTS, buildTitle, type TerminalSettings } from '../shared/settings';
+import { signonUser, type HistoryEntry } from '../shared/history';
 import * as path from 'node:path';
 import { buildDemoScreen } from '../engine/demoScreen';
 import { HostConnection } from './connection';
@@ -29,6 +30,12 @@ export class TerminalPanel {
   static onActiveChanged: (() => void) | undefined;
   /** Told when a tab opens, closes, connects, disconnects or changes its title. */
   static readonly onDidChange = new Set<() => void>();
+  /** Where connections are written for the History view (set by the extension). */
+  static history: { record(entry: HistoryEntry): void } | undefined;
+  /** The running history entry of this tab, between connect and disconnect. */
+  private historyEntry: HistoryEntry | undefined;
+  /** Why the next disconnect happens, when the tab itself causes it. */
+  private endReason: HistoryEntry['endedBy'] | undefined;
 
   private static changed(): void {
     for (const f of TerminalPanel.onDidChange) f();
@@ -153,6 +160,7 @@ export class TerminalPanel {
           this.output.appendLine(`[${label}] ${status}: ${detail}`);
           TerminalPanel.onActiveChanged?.();
           TerminalPanel.changed();
+          this.recordHistory(status, detail, info.manual === true);
         },
         alarm: () => this.post({ type: 'alarm' }),
         clientAuth: async () => {
@@ -236,6 +244,43 @@ export class TerminalPanel {
     return this.template;
   }
 
+  /** Opens a history entry on connect, closes it on disconnect (device name as finally accepted). */
+  private recordHistory(status: string, detail: string, manual: boolean): void {
+    const p = this.profile;
+    if (!p || !TerminalPanel.history) return;
+    if (status === 'connected') {
+      const saved = resolvedSessions().some((s) => s.name === p.name && s.host === p.host);
+      this.historyEntry = {
+        id: `${Date.now().toString(36)}-${this.letter}`,
+        sessionName: saved ? p.name : '',
+        host: p.host,
+        port: p.port,
+        tls: p.tls,
+        screenSize: p.screenSize,
+        deviceName: p.deviceName,
+        user: p.autoSignon ? p.signonUser.trim().toUpperCase() : '',
+        tabTitle: this.title,
+        start: Date.now(),
+      };
+      TerminalPanel.history.record(this.historyEntry);
+    } else if (status === 'disconnected' && this.historyEntry && !this.historyEntry.end) {
+      const endedBy = this.endReason ?? (manual ? 'user' : /closed by host/i.test(detail) ? 'host' : 'error');
+      this.endReason = undefined;
+      this.historyEntry = { ...this.historyEntry, deviceName: p.deviceName, tabTitle: this.title, end: Date.now(), endedBy };
+      TerminalPanel.history.record(this.historyEntry);
+      this.historyEntry = undefined;
+    }
+  }
+
+  /** Enter on the sign-on screen: remember the user profile for the history entry. */
+  private noteSignon(): void {
+    if (!this.historyEntry || this.historyEntry.user || !this.controller || !TerminalPanel.history) return;
+    const user = signonUser(this.controller.screenText());
+    if (!user) return;
+    this.historyEntry = { ...this.historyEntry, user };
+    TerminalPanel.history.record(this.historyEntry);
+  }
+
   /**
    * Connection settings saved while the tab is open (Save & Reload): the tab takes the new
    * values and reconnects. The controller shares the profile object, so assigning onto it is
@@ -249,6 +294,7 @@ export class TerminalPanel {
     Object.assign(this.profile, { ...profile, deviceName });
     this.rows = this.profile.screenSize === '27x132' ? 27 : 24;
     this.cols = this.profile.screenSize === '27x132' ? 132 : 80;
+    this.endReason = 'reload';
     this.disconnect();
     this.refreshTitle();
     this.pushConfig();
@@ -334,6 +380,7 @@ export class TerminalPanel {
         }
         break;
       case 'action':
+        if (msg.action === 'enter') this.noteSignon();
         this.controller?.press(msg.action);
         break;
       case 'text':
@@ -375,6 +422,10 @@ export class TerminalPanel {
 
   private dispose(): void {
     this.disposed = true;
+    if (this.historyEntry && !this.historyEntry.end) {
+      this.endReason = 'closed';
+      this.recordHistory('disconnected', 'tab closed', false);
+    }
     TerminalPanel.open.delete(this);
     TerminalPanel.letters.delete(this.letter);
     TerminalPanel.changed();

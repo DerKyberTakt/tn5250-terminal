@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Keyboard settings page: a visual keyboard above the search. Keys light up as you press them, a green dot marks the keys that have a function (hover lists them), a click on a key lists the functions bound to it, and while Assign is active you can click the modifiers and the key instead of pressing them, then Save keybind.
+- Sessions side bar: connections with an open tab come first, with a green glowing icon while connected and a badge with the connected count; each expands to its open tabs (click shows the tab; Close and Reconnect on the row). A click on a connected session shows its most recent tab; the plug icon still opens another. Tabs for hosts not saved as connections appear under "Unsaved connections". The row's hover icons no longer stick after a click.
+- History view in the TN5250 side bar: every connection is recorded with host, session, tab title, workstation name, the user profile typed on the sign-on screen (or the bypass sign-on user), start, end, duration and how it ended. Click twice (or the info icon) for the details, Connect again, Copy device name and Remove; Clear History in the view title. Settings `tn5250.history.enabled` and `tn5250.history.limit`. The job number is not in the 5250 data stream, so it is not recorded.
+
 ## 0.1.5 - 2026-11-03
 
 - Settings that only take effect on a new connection (host, port, protocol, workstation ID, screen size, code page, timeouts, type-ahead, auto-reconnect, alarm) are marked on the settings page. Saving one of them while a terminal that uses it is open now asks: **Save & Reload** reconnects those tabs with the new values at once, **Save & Close** saves only. Before, a screen-size change needed a new tab, and a Default change did not reach a tab whose saved session overrode that field.

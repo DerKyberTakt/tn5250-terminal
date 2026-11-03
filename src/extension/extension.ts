@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { TerminalPanel } from './terminalPanel';
 import { SettingsPanel } from './settingsPanel';
 import { SessionItem, SessionsProvider, TabItem } from './sessionsView';
+import { HistoryItem, HistoryProvider, HistoryStore, detailRows } from './historyView';
+import { resolveSettings } from '../shared/settings';
 import { readDefaults, readSessions, removeSessionAt, resolvedSessions, writeSessions } from './settingsStore';
 import { importKmpInteractive } from './kmpCommand';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
@@ -39,6 +41,12 @@ async function saveTrace(): Promise<void> {
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('TN5250');
   context.subscriptions.push(output);
+
+  const history = new HistoryStore(context);
+  TerminalPanel.history = history;
+  const historyProvider = new HistoryProvider(history, context);
+  const historyView = vscode.window.createTreeView('tn5250.history', { treeDataProvider: historyProvider });
+  context.subscriptions.push(historyView);
 
   const sessions = new SessionsProvider(context);
   const sessionsView = vscode.window.createTreeView('tn5250.sessions', { treeDataProvider: sessions });
@@ -175,6 +183,47 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     const doc = await vscode.workspace.openTextDocument({ content: text, language: 'plaintext' });
     await vscode.window.showTextDocument(doc, { preview: false });
+  });
+  // History: one click selects, a second click within 400 ms opens the details.
+  let lastHistoryClick: { id: string; at: number } | undefined;
+  const historyConnect = (item: HistoryItem | undefined): void => {
+    const e = item?.entry;
+    if (!e) return;
+    const index = resolvedSessions().findIndex((s) => e.sessionName && s.name === e.sessionName && s.host === e.host);
+    if (index >= 0) openSession(index);
+    else TerminalPanel.create(context, output, resolveSettings(readDefaults(), { host: e.host, port: e.port, tls: e.tls, name: '', screenSize: e.screenSize as '24x80' | '27x132' }));
+  };
+  const historyDetails = async (item: HistoryItem): Promise<void> => {
+    const e = item.entry;
+    type Pick = vscode.QuickPickItem & { act?: 'connect' | 'copy' | 'remove' };
+    const items: Pick[] = [
+      ...detailRows(e).map(([label, description]) => ({ label, description })),
+      { label: '', kind: vscode.QuickPickItemKind.Separator },
+      { label: '$(plug) Connect again', act: 'connect' as const },
+      { label: '$(copy) Copy device name', act: 'copy' as const, description: e.deviceName || undefined },
+      { label: '$(trash) Remove entry', act: 'remove' as const },
+    ];
+    const pick = await vscode.window.showQuickPick(items, { title: `${e.sessionName || e.host} - ${new Date(e.start).toLocaleString()}`, placeHolder: 'Connection details; pick an action or press Esc' });
+    if (pick?.act === 'connect') historyConnect(item);
+    else if (pick?.act === 'copy') {
+      await vscode.env.clipboard.writeText(e.deviceName);
+      void vscode.window.setStatusBarMessage(`TN5250: ${e.deviceName || 'nothing'} copied`, 2500);
+    } else if (pick?.act === 'remove') history.remove(e.id);
+  };
+  register('tn5250.historyClick', (item: HistoryItem) => {
+    if (!item?.entry) return;
+    const now = Date.now();
+    if (lastHistoryClick?.id === item.entry.id && now - lastHistoryClick.at < 400) {
+      lastHistoryClick = undefined;
+      void historyDetails(item);
+    } else lastHistoryClick = { id: item.entry.id, at: now };
+  });
+  register('tn5250.historyDetails', (item: HistoryItem) => (item?.entry ? historyDetails(item) : undefined));
+  register('tn5250.historyConnect', historyConnect);
+  register('tn5250.historyRemove', (item: HistoryItem) => (item?.entry ? history.remove(item.entry.id) : undefined));
+  register('tn5250.clearHistory', async () => {
+    const ok = await vscode.window.showWarningMessage('Clear the connection history?', { modal: true }, 'Clear');
+    if (ok === 'Clear') history.clear();
   });
   register('tn5250.demoScreen', () => TerminalPanel.create(context, output));
   register('tn5250.disconnect', () => TerminalPanel.active?.disconnect());
