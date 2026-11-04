@@ -68,7 +68,8 @@ All options are available on the Settings page and as ordinary VS Code settings 
 
 ## Security and privacy
 
-- Passwords and certificate passphrases are stored in the VS Code secret store, never in settings files.
+- Passwords and certificate passphrases are stored in the VS Code secret store, never in settings files, logs or traces (a saved trace blanks what was typed into non-display fields). The secret store is protected by the operating system keyring where there is one (Windows Credential Manager, macOS Keychain, a Secret Service keyring on Linux); on a Linux machine without a keyring, leave bypass sign-on off. Passwords are keyed by user profile and host, so a session never picks up another user's password.
+- Bypass sign-on types the password only into a non-display field on the first screens after connect. Over plain telnet it travels unencrypted, like a typed sign-on; use TLS (port 992) where the host offers it. A refused TLS certificate shows its SHA-256 fingerprint and can be trusted for that session, or the signing CA can be given as a PEM file; TLS client certificates are experimental in the extension and not supported by the desktop app.
 - TLS connections validate the host certificate by default; self-signed hosts can be allowed per connection.
 - Imported fonts are copied into the extension's own storage and loaded only for the terminal. No telemetry, no network access other than the host you connect to.
 - The History view keeps host, port, workstation name, user profile (read from the sign-on screen or the bypass sign-on setting), tab title and times in VS Code's global state on your machine. Never passwords or screen contents. `tn5250.history.enabled` turns it off, `tn5250.history.limit` caps it, and Clear History empties it.

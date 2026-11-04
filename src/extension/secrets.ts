@@ -1,14 +1,8 @@
 import * as vscode from 'vscode';
+import { certPassphraseKey, legacyPasswordKey, passwordKey } from './secretKeys';
 import { readDefaults, readSessions } from './settingsStore';
 
-/** Secret-store key for a profile's sign-on password. */
-export function passwordKey(profileName: string, host: string): string {
-  return `tn5250.password:${profileName || host}`;
-}
-
-export function certPassphraseKey(profileName: string, host: string): string {
-  return `tn5250.certpass:${profileName || host}`;
-}
+export { certPassphraseKey, findPassword, forgetProfileSecrets, legacyPasswordKey, passwordKey, type SecretStore } from './secretKeys';
 
 export async function setCertPassphraseInteractive(context: vscode.ExtensionContext, target: number): Promise<void> {
   const name = target < 0 ? 'Defaults' : (readSessions()[target]?.name ?? readSessions()[target]?.host ?? '');
@@ -29,14 +23,16 @@ export async function setCertPassphraseInteractive(context: vscode.ExtensionCont
 export async function setPasswordInteractive(context: vscode.ExtensionContext, target: number): Promise<void> {
   const name = target < 0 ? 'Defaults' : (readSessions()[target]?.name ?? readSessions()[target]?.host ?? '');
   const host = target < 0 ? readDefaults().host : (readSessions()[target]?.host ?? '');
+  const user = target < 0 ? readDefaults().signonUser : (readSessions()[target]?.signonUser ?? readDefaults().signonUser);
   const value = await vscode.window.showInputBox({
-    title: `TN5250: sign-on password for ${name}`,
-    prompt: 'Stored in the VS Code secret store. Leave empty to remove.',
+    title: `TN5250: sign-on password for ${user.trim() ? `${user.trim().toUpperCase()} at ${host}` : name}`,
+    prompt: 'Stored in the VS Code secret store (protected by the operating system keyring where there is one). Leave empty to remove.',
     password: true,
     ignoreFocusOut: true,
   });
   if (value === undefined) return;
-  const key = passwordKey(target < 0 ? '' : name, host);
+  const key = passwordKey(target < 0 ? '' : name, host, user);
+  if (!user.trim()) await context.secrets.delete(legacyPasswordKey(target < 0 ? '' : name, host));
   if (value) await context.secrets.store(key, value);
   else await context.secrets.delete(key);
   void vscode.window.showInformationMessage(value ? 'TN5250: password stored.' : 'TN5250: password removed.');

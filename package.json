@@ -34,6 +34,16 @@
   "activationEvents": [
     "onWebviewPanel:tn5250.terminal"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Session profiles, hosts, PC command policy and TLS trust are read from user settings only (application scope); an untrusted workspace cannot point a session at another host or feed it files.",
+      "restrictedConfigurations": [
+        "tn5250.font.file",
+        "tn5250.watermark.image"
+      ]
+    }
+  },
   "contributes": {
     "commands": [
       {
@@ -381,6 +391,7 @@
           "description": "Show the last key events in the terminal tab (used to verify keyboard capture)."
         },
         "tn5250.sessions": {
+          "scope": "application",
           "type": "array",
           "default": [],
           "description": "Saved sessions shown in the TN5250 side bar.",
@@ -423,31 +434,49 @@
           "description": "Order of the connections in the side bar."
         },
         "tn5250.connection.defaultHost": {
+          "scope": "application",
           "default": "",
           "type": "string",
           "description": "Host used by Connect to Previous when no connection is saved."
         },
         "tn5250.connection.defaultPort": {
+          "scope": "application",
           "default": 23,
           "type": "integer",
           "description": "TN5250: port. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.tls": {
+          "scope": "application",
           "default": false,
           "type": "boolean",
           "description": "TN5250: tls. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.verifyCertificate": {
+          "scope": "application",
           "default": true,
           "type": "boolean",
           "description": "TN5250: verify certificate. Set it on the TN5250 Settings page."
         },
+        "tn5250.connection.tlsPinnedCertificate": {
+          "scope": "application",
+          "default": "",
+          "type": "string",
+          "description": "TN5250: SHA-256 fingerprint of the one host certificate to accept (set by \"Trust this certificate\" after a rejected certificate). Set it on the TN5250 Settings page."
+        },
+        "tn5250.connection.tlsCaFile": {
+          "scope": "application",
+          "default": "",
+          "type": "string",
+          "description": "TN5250: PEM file with the CA certificate(s) that signed the host certificate, for example an IBM i DCM local CA. Set it on the TN5250 Settings page."
+        },
         "tn5250.connection.deviceName": {
+          "scope": "application",
           "default": "",
           "type": "string",
           "description": "Workstation ID template: &COMPN computer name, &USERN user name, * letter per open tab, = digit per open tab (e.g. OD1N*=). Blank lets the host assign QPADEVnnnn."
         },
         "tn5250.connection.defaultScreenSize": {
+          "scope": "application",
           "default": "24x80",
           "type": "string",
           "enum": [
@@ -457,6 +486,7 @@
           "description": "TN5250: screen size. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.defaultCodePage": {
+          "scope": "application",
           "default": 37,
           "type": "integer",
           "enum": [
@@ -476,37 +506,56 @@
           ],
           "description": "TN5250: code page. Set it on the TN5250 Settings page."
         },
+        "tn5250.connection.keyboardType": {
+          "scope": "application",
+          "default": "",
+          "type": "string",
+          "description": "TN5250: KBDTYPE sent to the host with the workstation name (3-letter IBM keyboard type such as USB, AGB, UKB). Empty = the type IBM lists for the host code page. Set it on the TN5250 Settings page."
+        },
+        "tn5250.connection.keyboardType": {
+          "scope": "application",
+          "default": "",
+          "type": "string",
+          "description": "TN5250: KBDTYPE sent to the host with the workstation name (3-letter IBM keyboard type such as USB, AGB, UKB). Empty = the type IBM lists for the host code page. Set it on the TN5250 Settings page."
+        },
         "tn5250.connection.autoConnect": {
+          "scope": "application",
           "default": true,
           "type": "boolean",
           "description": "TN5250: auto connect. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.autoReconnect": {
+          "scope": "application",
           "default": false,
           "type": "boolean",
           "description": "TN5250: auto reconnect. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.connectTimeoutSeconds": {
+          "scope": "application",
           "default": 15,
           "type": "integer",
           "description": "TN5250: connect timeout seconds. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.inactivityTimeoutMinutes": {
+          "scope": "application",
           "default": 0,
           "type": "integer",
           "description": "TN5250: inactivity timeout minutes. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.keepAlive": {
+          "scope": "application",
           "default": true,
           "type": "boolean",
           "description": "TN5250: keep alive. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.autoSignon": {
+          "scope": "application",
           "default": false,
           "type": "boolean",
           "description": "Fill the Sign On screen with the user ID and the password from the secret store."
         },
         "tn5250.connection.signonUser": {
+          "scope": "application",
           "default": "",
           "type": "string",
           "description": "TN5250: signon user. Set it on the TN5250 Settings page."
@@ -952,6 +1001,7 @@
           "description": "TN5250: type-ahead. Set it on the TN5250 Settings page."
         },
         "tn5250.behavior.pcCommands": {
+          "scope": "application",
           "default": "links",
           "type": "string",
           "enum": [
@@ -960,7 +1010,7 @@
             "all",
             "off"
           ],
-          "description": "TN5250: PC commands from the host (STRPCCMD). Set it on the TN5250 Settings page."
+          "description": "TN5250: PC commands from the host (STRPCCMD). links: open http(s) links only; ask: confirm every command; all: run ANY command the host sends on this PC without asking (the host, or anyone who controls it, can then run anything here); off: show the host's fallback screen. Set it on the TN5250 Settings page."
         },
         "tn5250.display.subfileScrollBar": {
           "default": false,
@@ -1004,21 +1054,25 @@
           "description": "Enhanced UI: text glow radius in pixels (0 = none)."
         },
         "tn5250.connection.demoMode": {
+          "scope": "application",
           "type": "boolean",
           "default": false,
           "description": "Mark sessions as demo/test: tilted watermark, coloured frame, DEMO in the tab title and status line."
         },
         "tn5250.connection.demoLabel": {
+          "scope": "application",
           "type": "string",
           "default": "DEMO",
           "description": "Label shown for demo sessions."
         },
         "tn5250.connection.demoColor": {
+          "scope": "application",
           "type": "string",
           "default": "#ff9f1c",
           "description": "Colour of the demo watermark and frame."
         },
         "tn5250.connection.tlsClientAuth": {
+          "scope": "application",
           "type": "string",
           "enum": [
             "none",
@@ -1029,11 +1083,13 @@
           "description": "TLS client authentication: none, a PKCS#12 file, or PEM certificate and key files. Experimental: not verified against an IBM i that requires client certificates."
         },
         "tn5250.connection.tlsClientCert": {
+          "scope": "application",
           "type": "string",
           "default": "",
           "description": "Path of the PKCS#12 (.pfx/.p12) file or the PEM certificate."
         },
         "tn5250.connection.tlsClientKey": {
+          "scope": "application",
           "type": "string",
           "default": "",
           "description": "Path of the PEM private key (PEM mode only)."

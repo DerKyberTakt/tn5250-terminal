@@ -11,8 +11,8 @@ import { buildDemoScreen } from '../engine/demoScreen';
 import { HostConnection } from './connection';
 import { runPcCommand } from './pcShell';
 import { SessionController } from './sessionController';
-import { readDefaults, resolvedSessions } from './settingsStore';
-import { certPassphraseKey, passwordKey } from './secrets';
+import { readDefaults, readSessions, resolvedSessions, saveSession } from './settingsStore';
+import { certPassphraseKey, findPassword } from './secrets';
 import * as fsp from 'node:fs/promises';
 import { buildWebviewHtml } from './webviewHtml';
 
@@ -189,7 +189,11 @@ export class TerminalPanel {
           }
         },
         nextDeviceName: () => (this.template && /[*=]/.test(this.template) ? TerminalPanel.expandDevice(this.template) : undefined),
-        password: async () => (await context.secrets.get(passwordKey(profile.name, profile.host))) ?? (await context.secrets.get(passwordKey('', profile.host))),
+        password: async () => {
+          const user = (resolvedSessions().find((s) => s.name === profile.name && s.host === profile.host) ?? profile).signonUser;
+          return findPassword(context.secrets, profile, user);
+        },
+        certificateRejected: (fingerprint, reason) => void this.offerTrust(fingerprint, reason),
         signon: () => resolvedSessions().find((s) => s.name === profile.name && s.host === profile.host) ?? profile,
         log: (message) => this.output.appendLine(`[${label}] ${message}`),
         pcCommandPolicy: () => this.liveSettings().pcCommands,
@@ -336,6 +340,35 @@ export class TerminalPanel {
 
   exportTrace(): Record<string, unknown> | undefined {
     return this.controller?.exportTrace();
+  }
+
+  /**
+   * The host certificate was refused: offer to pin its fingerprint on this session
+   * ("trust this certificate"), then connect again. Unsaved (ad-hoc) sessions get the
+   * pin for this tab only.
+   */
+  private async offerTrust(fingerprint: string, reason: string): Promise<void> {
+    if (!this.profile || !this.controller) return;
+    const pretty = fingerprint.replace(/[^0-9a-f]/gi, '').toUpperCase().replace(/(..)(?=.)/g, '$1:');
+    const choice = await vscode.window.showWarningMessage(
+      `TN5250: the certificate of ${this.profile.host} was not accepted: ${reason}.
+
+SHA-256 fingerprint:
+${pretty}
+
+Trust it only if this fingerprint matches what the system administrator shows for this host.`,
+      { modal: true },
+      'Trust this certificate',
+    );
+    if (choice !== 'Trust this certificate') return;
+    this.profile.tlsPinnedCertificate = fingerprint;
+    const index = readSessions().findIndex((s) => s.name === this.profile!.name && s.host === this.profile!.host);
+    if (index >= 0) {
+      const saved = resolvedSessions()[index];
+      if (saved) await saveSession(index, { ...saved, tlsPinnedCertificate: fingerprint });
+    }
+    this.output.appendLine(`[${this.profile.name || this.profile.host}] certificate ${pretty} trusted for this session`);
+    this.controller.reconnectNow();
   }
 
   /** Demo screen only (no session): flips between 24x80 and 27x132. */

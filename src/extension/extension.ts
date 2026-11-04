@@ -35,7 +35,7 @@ async function saveTrace(): Promise<void> {
   });
   if (!target) return;
   await vscode.workspace.fs.writeFile(target, Buffer.from(JSON.stringify(trace, null, 1) + '\n', 'utf8'));
-  void vscode.window.showInformationMessage(`TN5250: trace saved to ${target.fsPath}. It contains screen contents; share it only with people allowed to see them.`);
+  void vscode.window.showInformationMessage(`TN5250: trace saved to ${target.fsPath}. It contains screen contents (what was typed into non-display fields is blanked); share it only with people allowed to see them.`);
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -153,7 +153,7 @@ export function activate(context: vscode.ExtensionContext): void {
   register('tn5250.removeSession', async (item: SessionItem) => {
     if (!item?.profile) return;
     const ok = await vscode.window.showWarningMessage(`Remove connection "${item.profile.name}"?`, { modal: true }, 'Remove');
-    if (ok === 'Remove') await removeSessionAt(item.index);
+    if (ok === 'Remove') await removeSessionAt(item.index, context.secrets);
     sessions.refresh();
   });
   register('tn5250.openSettings', () => {

@@ -10,11 +10,18 @@ else: no Java, no Node, no packages on the IBM i.
 
 ```
 extension host (Node, bundled with VS Code)        webview tab (canvas)
-  src/extension/   commands, panels, settings  <->   src/webview/  renderer,
-  src/host/        sockets (net / tls)          msgs  keymap, OIA, selection
+  src/extension/   commands, panels, settings  <->   src/webview/   renderer,
+                   store, sockets (net / tls),  msgs                 keymap, OIA,
+                   session controller                               selection, GUI
   src/engine/      pure TN5250 protocol: no vscode, DOM or Node imports
-  src/shared/      message types between host and webview
+  src/shared/      message types, settings model, key maps, helpers
+  src/settings/    the ACS-style settings page (a webview too)
 ```
+
+The desktop app (tn5250-desktop) reuses `src/engine`, `src/shared`, `src/webview`,
+`src/settings` and the session controller unchanged; its own host code is
+`src/desktop/` (TypeScript page) and `app.go` / `net.go` (Go, sockets and OS
+services through Wails).
 
 - The **engine** is deterministic: bytes in, screen model and bytes out. It is
   tested with recorded data streams (`test/fixtures`) and synthetic streams.
@@ -48,14 +55,29 @@ and work normally.
 ## Sizing
 
 The renderer scales the font so the full 24x80 or 27x132 grid fits the tab
-(`tn5250.appearance.autoFit`). Ctrl+wheel, Ctrl+=, Ctrl+- zoom relative to the
+(`tn5250.font.autoFit`). Ctrl+wheel, Ctrl+=, Ctrl+- zoom relative to the
 fitted size and Ctrl+0 resets; the viewport scrolls when zoomed past the tab.
 
 ## Security
 
-- Passwords are never stored; the sign-on screen is the authentication.
-- TLS is a per-profile option (`tls: true`, port 992). Certificates are
-  validated; untrusted ones prompt before the first connection.
+- Passwords are never written to settings files, logs or traces: a session trace
+  blanks what was typed into non-display fields. With bypass sign-on the
+  password is kept in VS Code's SecretStorage, which encrypts it with a key
+  protected by the operating system's credential store (Windows Credential
+  Manager, macOS Keychain, the Secret Service keyring on Linux). Where no such
+  store exists, VS Code falls back to a weaker in-process scheme or keeps the
+  secret in memory only; leave bypass sign-on off on such machines. Keys are
+  per user profile and host, never shared between users of the same host.
+- Bypass sign-on types the password only into a non-display field, and only on
+  the first screens after connect.
+- TLS is a per-profile option (`tls: true`, port 992), TLS 1.2 or later. The
+  host certificate is checked against the system roots plus an optional CA file
+  (`tlsCaFile`, for a DCM local CA); a refused certificate shows its SHA-256
+  fingerprint and can be pinned for that session (`tlsPinnedCertificate`).
+  `verifyCertificate: false` accepts anything and is the last resort.
+- Session profiles, hosts, the PC command policy and TLS trust are
+  application-scoped settings: a workspace's `.vscode/settings.json` cannot
+  change them.
 - The webview runs with a strict Content Security Policy and only loads the
   extension's own bundled script and stylesheet.
 

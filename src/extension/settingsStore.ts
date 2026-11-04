@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { forgetProfileSecrets } from './secretKeys';
 import {
   SETTINGS_DEFAULTS,
   SETTINGS_KEYS,
@@ -15,12 +16,15 @@ const DEFAULT_KEYS: Record<keyof TerminalSettings, string | undefined> = {
   port: 'connection.defaultPort',
   tls: 'connection.tls',
   verifyCertificate: 'connection.verifyCertificate',
+  tlsPinnedCertificate: 'connection.tlsPinnedCertificate',
+  tlsCaFile: 'connection.tlsCaFile',
   tlsClientAuth: 'connection.tlsClientAuth',
   tlsClientCert: 'connection.tlsClientCert',
   tlsClientKey: 'connection.tlsClientKey',
   deviceName: 'connection.deviceName',
   screenSize: 'connection.defaultScreenSize',
   codePage: 'connection.defaultCodePage',
+  keyboardType: 'connection.keyboardType',
   autoConnect: 'connection.autoConnect',
   autoReconnect: 'connection.autoReconnect',
   connectTimeoutSeconds: 'connection.connectTimeoutSeconds',
@@ -171,10 +175,22 @@ export async function saveSession(index: number, values: TerminalSettings): Prom
   await writeSessions(sessions);
 }
 
-export async function removeSessionAt(index: number): Promise<void> {
+/**
+ * Removes a saved session and its secrets: the password and certificate passphrase
+ * saved under its own name, and the USER@host password unless another session still
+ * signs on with the same user at the same host.
+ */
+export async function removeSessionAt(index: number, secrets?: vscode.SecretStorage): Promise<void> {
   const sessions = readSessions();
+  const removed = sessions[index];
   sessions.splice(index, 1);
   await writeSessions(sessions);
+  if (removed && secrets) {
+    const defaults = readDefaults();
+    const gone = resolveSettings(defaults, removed);
+    const remaining = sessions.map((s) => resolveSettings(defaults, s));
+    await forgetProfileSecrets(secrets, gone, remaining);
+  }
 }
 
 /** Settings for an ad-hoc connection: the defaults with a host and port. */

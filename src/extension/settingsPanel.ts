@@ -185,7 +185,7 @@ export class SettingsPanel {
         const name = readSessions()[msg.index]?.name ?? 'this session';
         const ok = await vscode.window.showWarningMessage(`Remove "${name}"?`, { modal: true }, 'Remove');
         if (ok === 'Remove') {
-          await removeSessionAt(msg.index);
+          await removeSessionAt(msg.index, this.context.secrets);
           this.select = -1;
           this.push();
         }
@@ -207,10 +207,11 @@ export class SettingsPanel {
       }
       case 'browseFile': {
         const pem = msg.key === 'tlsClientKey';
+        const ca = msg.key === 'tlsCaFile';
         const picked = await vscode.window.showOpenDialog({
-          title: pem ? 'Client private key (PEM)' : 'Client certificate (PKCS#12 or PEM)',
+          title: ca ? 'CA certificate (PEM)' : pem ? 'Client private key (PEM)' : 'Client certificate (PKCS#12 or PEM)',
           canSelectMany: false,
-          filters: pem ? { 'PEM key': ['pem', 'key'], 'All files': ['*'] } : { Certificates: ['pfx', 'p12', 'pem', 'crt', 'cer'], 'All files': ['*'] },
+          filters: ca ? { 'PEM certificate': ['pem', 'crt', 'cer'], 'All files': ['*'] } : pem ? { 'PEM key': ['pem', 'key'], 'All files': ['*'] } : { Certificates: ['pfx', 'p12', 'pem', 'crt', 'cer'], 'All files': ['*'] },
         });
         if (picked?.[0]) this.push({ [msg.key]: picked[0].fsPath } as Partial<TerminalSettings>);
         break;
