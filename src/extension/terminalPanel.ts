@@ -194,6 +194,7 @@ export class TerminalPanel {
           return findPassword(context.secrets, profile, user);
         },
         certificateRejected: (fingerprint, reason) => void this.offerTrust(fingerprint, reason),
+        signonHint: (info) => void this.signonHint(info.codePage, info.chars),
         signon: () => resolvedSessions().find((s) => s.name === profile.name && s.host === profile.host) ?? profile,
         log: (message) => this.output.appendLine(`[${label}] ${message}`),
         pcCommandPolicy: () => this.liveSettings().pcCommands,
@@ -340,6 +341,20 @@ export class TerminalPanel {
 
   exportTrace(): Record<string, unknown> | undefined {
     return this.controller?.exportTrace();
+  }
+
+  /**
+   * A sign-on failed with a password that holds characters that differ between code pages:
+   * the session's code page may not be the host's CCSID. One toast per connection.
+   */
+  private async signonHint(codePage: number, chars: string[]): Promise<void> {
+    const choice = await vscode.window.showWarningMessage(
+      `TN5250: sign-on failed and the password contains characters that are different in other code pages (${chars.join(' ')}). This session uses code page ${codePage}; the host reads what you type with its own CCSID (QCCSID or the user profile). If the user ID and password are right, set Host Code Page to the host's value. Each failed attempt counts toward QMAXSIGN.`,
+      'Open Settings',
+      'Learn more',
+    );
+    if (choice === 'Open Settings') void vscode.commands.executeCommand('tn5250.openSettings');
+    else if (choice === 'Learn more') void vscode.env.openExternal(vscode.Uri.parse('https://github.com/DerKyberTakt/tn5250-terminal#troubleshooting'));
   }
 
   /**

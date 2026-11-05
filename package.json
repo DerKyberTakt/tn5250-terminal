@@ -504,13 +504,7 @@
             1148,
             1149
           ],
-          "description": "TN5250: code page. Set it on the TN5250 Settings page."
-        },
-        "tn5250.connection.keyboardType": {
-          "scope": "application",
-          "default": "",
-          "type": "string",
-          "description": "TN5250: KBDTYPE sent to the host with the workstation name (3-letter IBM keyboard type such as USB, AGB, UKB). Empty = the type IBM lists for the host code page. Set it on the TN5250 Settings page."
+          "description": "TN5250: EBCDIC code page the host reads keystrokes with. Match the host's CCSID (QCCSID or the user profile), or passwords with characters such as ! @ # [ ] fail with CPF1120. Set it on the TN5250 Settings page."
         },
         "tn5250.connection.keyboardType": {
           "scope": "application",
