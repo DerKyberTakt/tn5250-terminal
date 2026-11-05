@@ -13,8 +13,8 @@ jobs:
     env:
       HAS_PAT: ${{ secrets.VSCE_PAT != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -22,7 +22,7 @@ jobs:
       - run: npm run check
       - run: node esbuild.mjs --production
       - run: npx @vscode/vsce package --no-dependencies -o tn5250-terminal.vsix
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: tn5250-terminal.vsix
       - name: Publish to the Marketplace (skipped when VSCE_PAT is not set)
