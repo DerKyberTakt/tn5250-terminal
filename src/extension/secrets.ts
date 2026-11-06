@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { signonGate } from '../shared/signonGate';
 import { certPassphraseKey, legacyPasswordKey, passwordKey } from './secretKeys';
 import { readDefaults, readSessions } from './settingsStore';
 
@@ -35,5 +36,7 @@ export async function setPasswordInteractive(context: vscode.ExtensionContext, t
   if (!user.trim()) await context.secrets.delete(legacyPasswordKey(target < 0 ? '' : name, host));
   if (value) await context.secrets.store(key, value);
   else await context.secrets.delete(key);
+  // A new password: a paused bypass sign-on may try again.
+  signonGate.rearmAll();
   void vscode.window.showInformationMessage(value ? 'TN5250: password stored.' : 'TN5250: password removed.');
 }

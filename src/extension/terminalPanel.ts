@@ -5,6 +5,7 @@ import type { PcCommandKind } from '../shared/pcCommand';
 import type { HostToWebview, WebviewToHost } from '../shared/protocol';
 import { DEFAULT_OIA } from '../shared/protocol';
 import { SETTINGS_DEFAULTS, buildTitle, type TerminalSettings } from '../shared/settings';
+import { signonGate } from '../shared/signonGate';
 import { signonUser, type HistoryEntry } from '../shared/history';
 import * as path from 'node:path';
 import { buildDemoScreen } from '../engine/demoScreen';
@@ -194,7 +195,8 @@ export class TerminalPanel {
           return findPassword(context.secrets, profile, user);
         },
         certificateRejected: (fingerprint, reason) => void this.offerTrust(fingerprint, reason),
-        signonHint: (info) => void this.signonHint(info.codePage, info.chars),
+        signonHint: (info) => void this.signonHint(info.codePage, info.chars, info.paused === true),
+        signonFailed: (info) => void this.signonFailed(info.key),
         signon: () => resolvedSessions().find((s) => s.name === profile.name && s.host === profile.host) ?? profile,
         log: (message) => this.output.appendLine(`[${label}] ${message}`),
         pcCommandPolicy: () => this.liveSettings().pcCommands,
@@ -212,6 +214,8 @@ export class TerminalPanel {
         if (e.affectsConfiguration('tn5250')) {
           this.keyOverlay = vscode.workspace.getConfiguration('tn5250').get<boolean>('debug.keyOverlay', false);
           this.pushConfig();
+          // Settings saved: a paused bypass sign-on may try again (one session at a time).
+          signonGate.rearmAll();
         }
       }),
       panel.onDidDispose(() => this.dispose()),
@@ -347,14 +351,23 @@ export class TerminalPanel {
    * A sign-on failed with a password that holds characters that differ between code pages:
    * the session's code page may not be the host's CCSID. One toast per connection.
    */
-  private async signonHint(codePage: number, chars: string[]): Promise<void> {
+  private async signonHint(codePage: number, chars: string[], paused: boolean): Promise<void> {
     const choice = await vscode.window.showWarningMessage(
-      `TN5250: sign-on failed and the password contains characters that are different in other code pages (${chars.join(' ')}). This session uses code page ${codePage}; the host reads what you type with its own CCSID (QCCSID or the user profile). If the user ID and password are right, set Host Code Page to the host's value. Each failed attempt counts toward QMAXSIGN.`,
+      `TN5250: sign-on failed and the password contains characters that are different in other code pages (${chars.join(' ')}). This session uses code page ${codePage}; the host reads what you type with its own CCSID (QCCSID or the user profile). If the user ID and password are right, set Host Code Page to the host's value. Each failed attempt counts toward QMAXSIGN.${paused ? ' Bypass sign-on is paused for this user and host in every session until the settings are saved.' : ''}`,
       'Open Settings',
       'Learn more',
     );
     if (choice === 'Open Settings') void vscode.commands.executeCommand('tn5250.openSettings');
     else if (choice === 'Learn more') void vscode.env.openExternal(vscode.Uri.parse('https://github.com/DerKyberTakt/tn5250-terminal#troubleshooting'));
+  }
+
+  /** A bypass sign-on was refused: it is paused for that user and host so QMAXSIGN is not used up. */
+  private async signonFailed(key: string): Promise<void> {
+    const choice = await vscode.window.showWarningMessage(
+      `TN5250: the bypass sign-on for ${key} was refused (the host showed the sign-on screen again). Bypass sign-on is paused for this user and host in every session, so the failed attempts do not reach QMAXSIGN. Check the saved password and the user ID; saving the settings or setting the password tries again, one session at a time.`,
+      'Open Settings',
+    );
+    if (choice === 'Open Settings') void vscode.commands.executeCommand('tn5250.openSettings');
   }
 
   /**

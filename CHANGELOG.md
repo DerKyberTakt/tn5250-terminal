@@ -2,6 +2,7 @@
 
 ## 0.2.1 - unreleased
 
+- Bypass sign-on guards QMAXSIGN: sessions for the same user profile and host sign on one at a time, and after the host refuses one the others do not send the password at all (a log line and one warning say so). Saving the settings, setting the password or reconnecting by hand tries again. Five tabs reloaded with a wrong code page, or a stale saved password on an auto-reconnect loop, no longer disable the profile. The session log names the code page in use on every connect.
 - Fixed: Save Screen left the GUI windows out of the image, so a screen restored after a called program (Restore Screen) came back with the window borders as raw blue cells instead of windows. The image now carries every Create Window with the cells it shows, in order, and Remove GUI Window still uncovers the screen beneath.
 
 ## 0.2.0 - 2026-11-04
