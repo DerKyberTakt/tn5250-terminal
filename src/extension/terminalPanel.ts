@@ -486,6 +486,9 @@ Trust it only if this fingerprint matches what the system administrator shows fo
         this.pushConfig();
         if (this.controller) {
           this.controller.publish();
+          // A webview recreated while connected (tab dragged into another window) must not
+          // sit on "Not connected": status events only report changes.
+          this.post({ type: 'status', ...this.controller.connectionState });
           if (this.profile?.autoConnect !== false) void this.controller.connect();
         } else {
           this.pushDemoScreen();

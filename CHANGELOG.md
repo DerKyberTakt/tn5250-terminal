@@ -2,6 +2,9 @@
 
 ## 0.2.1 - unreleased
 
+- Fixed: bytes the host sends that are not printable characters (X'01'-X'1F', X'FF': control bytes in file data from bad character conversions) showed as blanks; they now show as a box, as on ACS. Copy and Print Screen show the box too.
+- Fixed: a session tab dragged into another VS Code window came back saying "Not connected" while the session was running, until the connection state changed (reported by thomprl). The connection state is sent again whenever the terminal view loads.
+
 - Bypass sign-on guards QMAXSIGN: sessions for the same user profile and host sign on one at a time, and after the host refuses one the others do not send the password at all (a log line and one warning say so). Saving the settings, setting the password or reconnecting by hand tries again. Five tabs reloaded with a wrong code page, or a stale saved password on an auto-reconnect loop, no longer disable the profile. The session log names the code page in use on every connect.
 - Fixed: Save Screen left the GUI windows out of the image, so a screen restored after a called program (Restore Screen) came back with the window borders as raw blue cells instead of windows. The image now carries every Create Window with the cells it shows, in order, and Remove GUI Window still uncovers the screen beneath.
 
