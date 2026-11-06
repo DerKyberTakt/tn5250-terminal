@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 - unreleased
+
+- Fixed: Save Screen left the GUI windows out of the image, so a screen restored after a called program (Restore Screen) came back with the window borders as raw blue cells instead of windows. The image now carries every Create Window with the cells it shows, in order, and Remove GUI Window still uncovers the screen beneath.
+
 ## 0.2.0 - 2026-11-04
 
 - Fixed: a password with characters that differ between EBCDIC code pages (`!`, `@`, `#`, `[`, `]` ...) failed with CPF1120 when Host Code Page did not match the host's CCSID, and nothing pointed at the cause. After such a failed sign-on the emulator shows a one-time hint naming the characters and the code page in use (Output log too, never the password); the Host Code Page and Bypass signon help texts and a new README Troubleshooting section explain it; the keyboard type sent with the workstation name now follows the code page (#5, reported by ZodandSons).
