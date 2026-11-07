@@ -364,7 +364,7 @@ export class TerminalPanel {
   /** A bypass sign-on was refused: it is paused for that user and host so QMAXSIGN is not used up. */
   private async signonFailed(key: string): Promise<void> {
     const choice = await vscode.window.showWarningMessage(
-      `TN5250: the bypass sign-on for ${key} was refused (the host showed the sign-on screen again). Bypass sign-on is paused for this user and host in every session, so the failed attempts do not reach QMAXSIGN. Check the saved password and the user ID; saving the settings or setting the password tries again, one session at a time.`,
+      `TN5250: the bypass sign-on for ${key} was refused (the host showed the sign-on screen again). Bypass sign-on is paused for this user and host in every session, so the failed attempts do not reach QMAXSIGN. Check the saved password and the user ID; setting the password, saving the settings or opening the session again tries again, one session at a time.`,
       'Open Settings',
     );
     if (choice === 'Open Settings') void vscode.commands.executeCommand('tn5250.openSettings');
