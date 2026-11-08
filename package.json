@@ -135,6 +135,11 @@
         "category": "TN5250"
       },
       {
+        "command": "tn5250.importConnections",
+        "title": "Import Connections (ACS, Code for IBM i)",
+        "category": "TN5250"
+      },
+      {
         "command": "tn5250.setPassword",
         "title": "Set Sign-On Password (defaults)",
         "category": "TN5250"
@@ -332,6 +337,11 @@
           "command": "tn5250.openSettings",
           "when": "view == tn5250.sessions",
           "group": "navigation@5"
+        },
+        {
+          "command": "tn5250.importConnections",
+          "when": "view == tn5250.sessions",
+          "group": "1_import@1"
         }
       ],
       "view/item/context": [
@@ -1768,7 +1778,7 @@
     "viewsWelcome": [
       {
         "view": "tn5250.sessions",
-        "contents": "No connections yet.\n[New Connection](command:tn5250.newConnection)\n[Settings](command:tn5250.openSettings)"
+        "contents": "No connections yet.\n[New Connection](command:tn5250.newConnection)\n[Import Connections](command:tn5250.importConnections)\nFrom ACS session profiles or Code for IBM i.\n[Settings](command:tn5250.openSettings)"
       }
     ]
   },
