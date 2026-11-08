@@ -6,6 +6,7 @@ import { HistoryItem, HistoryProvider, HistoryStore, detailRows } from './histor
 import { resolveSettings } from '../shared/settings';
 import { readDefaults, readSessions, removeSessionAt, resolvedSessions, writeSessions } from './settingsStore';
 import { importKmpInteractive } from './kmpCommand';
+import { importConnectionsInteractive } from './importCommand';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
 
 const LAST_SESSION_KEY = 'tn5250.lastSession';
@@ -178,6 +179,17 @@ export function activate(context: vscode.ExtensionContext): void {
     for (const p of open) p.disconnect();
   });
   register('tn5250.importKmp', () => importKmpInteractive(-1));
+  register('tn5250.importConnections', async () => {
+    const outcome = await importConnectionsInteractive();
+    if (!outcome) return;
+    if (!outcome.imported) {
+      void vscode.window.showInformationMessage(outcome.message);
+      return;
+    }
+    sessions.refresh();
+    const open = await vscode.window.showInformationMessage(outcome.message, 'Open Settings');
+    if (open) SettingsPanel.show(context, output, outcome.firstIndex);
+  });
   register('tn5250.setPassword', () => setPasswordInteractive(context, -1));
   register('tn5250.printScreen', async () => {
     const text = TerminalPanel.active?.screenText();
