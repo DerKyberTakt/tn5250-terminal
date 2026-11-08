@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { EDITOR_ACTIONS, MacroRecorder, actionName, describeStep, macroProblems, newMacroId, runMacro, sanitizeMacro, type Macro, type MacroStep, type MacroTarget } from '../shared/macros';
+import { EDITOR_ACTIONS, MacroRecorder, actionName, describeStep, macroProblems, macrosFromJson, macrosToJson, mergeMacros, newMacroId, runMacro, sanitizeMacro, type Macro, type MacroStep, type MacroTarget } from '../shared/macros';
 import type { KeyAction } from '../shared/keymap';
 
 /**
@@ -55,6 +55,11 @@ class MacroStore {
 
   async remove(id: string): Promise<void> {
     await this.context?.globalState.update(STATE_KEY, this.list().filter((m) => m.id !== id));
+    this.changed.fire();
+  }
+
+  async replaceAll(macros: Macro[]): Promise<void> {
+    await this.context?.globalState.update(STATE_KEY, macros);
     this.changed.fire();
   }
 }
@@ -296,6 +301,38 @@ async function editSteps(original: Macro): Promise<void> {
   }
 }
 
+const MACRO_FILE_FILTER = { 'TN5250 macros': ['json'] };
+
+/** Writes every macro to a .json file the desktop app and other VS Code installs can import. */
+async function exportMacros(): Promise<void> {
+  const macros = macroStore.list();
+  if (!macros.length) {
+    void vscode.window.showInformationMessage('TN5250: no macros to export.');
+    return;
+  }
+  const target = await vscode.window.showSaveDialog({ title: 'Export macros', filters: MACRO_FILE_FILTER, defaultUri: vscode.Uri.file('tn5250-macros.json') });
+  if (!target) return;
+  await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(macrosToJson(macros)));
+  void vscode.window.showInformationMessage(`TN5250: ${macros.length} macro${macros.length === 1 ? '' : 's'} exported to ${target.fsPath}.`);
+}
+
+/** Reads a macros .json file: the same id replaces, a key another macro has is dropped. */
+async function importMacros(): Promise<void> {
+  const picked = await vscode.window.showOpenDialog({ title: 'Import macros', filters: MACRO_FILE_FILTER, canSelectMany: false });
+  const file = picked?.[0];
+  if (!file) return;
+  const text = new TextDecoder().decode(await vscode.workspace.fs.readFile(file));
+  const incoming = macrosFromJson(text);
+  if (!incoming) {
+    void vscode.window.showWarningMessage('TN5250: that file is not a macros export.');
+    return;
+  }
+  const r = mergeMacros(macroStore.list(), incoming);
+  await macroStore.replaceAll(r.macros);
+  const dropped = r.keysDropped.length ? ` The key of ${r.keysDropped.join(', ')} was already taken and was left off.` : '';
+  void vscode.window.showInformationMessage(`TN5250: ${r.added} macro${r.added === 1 ? '' : 's'} added, ${r.replaced} replaced.${dropped}`);
+}
+
 function macroItem(m: Macro): vscode.QuickPickItem & { macro: Macro } {
   return { label: m.name, description: m.key ? `$(keyboard) ${m.key}` : undefined, detail: `${m.steps.length} step${m.steps.length === 1 ? '' : 's'}: ${m.steps.slice(0, 4).map(describeStep).join(' · ')}${m.steps.length > 4 ? ' …' : ''}`, macro: m };
 }
@@ -321,9 +358,18 @@ export async function manageMacros(session: MacroSession | undefined, output: vs
     const macros = macroStore.list();
     const record = { label: '$(record) Record a new macro…', detail: session ? `In ${session.title}: what you type and press until TN5250: Stop Recording` : 'Open a terminal tab first', macro: undefined as Macro | undefined };
     const blank = { label: '$(add) New empty macro…', detail: 'Name it, then add steps one by one', macro: undefined as Macro | undefined, blank: true };
-    const pick = await vscode.window.showQuickPick([record, blank, ...macros.map(macroItem)], { title: 'TN5250: Macros', placeHolder: macros.length ? 'Pick a macro' : 'No macros yet', matchOnDescription: true });
+    const files = [
+      { label: '$(cloud-download) Import macros from a file…', macro: undefined as Macro | undefined, file: 'import' as const },
+      { label: '$(cloud-upload) Export macros to a file…', macro: undefined as Macro | undefined, file: 'export' as const },
+    ];
+    const pick = await vscode.window.showQuickPick([record, blank, ...macros.map(macroItem), ...files], { title: 'TN5250: Macros', placeHolder: macros.length ? 'Pick a macro' : 'No macros yet', matchOnDescription: true });
     if (!pick) return;
     if (!pick.macro) {
+      if ('file' in pick) {
+        if (pick.file === 'import') await importMacros();
+        else await exportMacros();
+        continue;
+      }
       if ('blank' in pick) {
         const fresh: Macro = { id: newMacroId(), name: '', key: '', steps: [] };
         const name = await askName(fresh);
