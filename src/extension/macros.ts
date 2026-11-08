@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { MacroRecorder, describeStep, macroProblems, newMacroId, runMacro, sanitizeMacro, type Macro, type MacroTarget } from '../shared/macros';
+import { EDITOR_ACTIONS, MacroRecorder, actionName, describeStep, macroProblems, newMacroId, runMacro, sanitizeMacro, type Macro, type MacroStep, type MacroTarget } from '../shared/macros';
 import type { KeyAction } from '../shared/keymap';
 
 /**
@@ -7,7 +7,7 @@ import type { KeyAction } from '../shared/keymap';
  * extension's global state, run from the Command Palette, the Macros list or their key.
  * The model, recorder and player are shared with the desktop app (src/shared/macros.ts);
  * the desktop app has the step editor, here a macro is recorded and then named, given a
- * key, renamed or deleted (the steps are shown, not edited).
+ * key, renamed or deleted, and its steps are edited with lists and input boxes.
  */
 
 const STATE_KEY = 'tn5250.macros';
@@ -178,6 +178,124 @@ export async function saveRecordedMacro(recorder: MacroRecorder): Promise<Macro 
   return macro;
 }
 
+/** Asks for the fields of a step; undefined when the user backs out. */
+async function askStep(kind: MacroStep['type'], current?: MacroStep): Promise<MacroStep | undefined> {
+  const text = async (prompt: string, value: string): Promise<string | undefined> =>
+    vscode.window.showInputBox({ title: 'TN5250: Macro step', prompt, value, ignoreFocusOut: true, validateInput: (v) => (v ? undefined : 'Cannot be empty.') });
+  const number = async (prompt: string, value: number): Promise<number | undefined> => {
+    const v = await vscode.window.showInputBox({ title: 'TN5250: Macro step', prompt, value: String(value), ignoreFocusOut: true, validateInput: (x) => (/^\d+$/.test(x.trim()) ? undefined : 'A whole number of milliseconds.') });
+    return v === undefined ? undefined : Number(v.trim());
+  };
+  switch (kind) {
+    case 'text': {
+      const t = await text('Text to type', current?.type === 'text' ? current.text : '');
+      return t === undefined ? undefined : { type: 'text', text: t };
+    }
+    case 'key': {
+      const pick = await vscode.window.showQuickPick(
+        EDITOR_ACTIONS.map((a) => ({ label: actionName(a), action: a, picked: current?.type === 'key' && current.action === a })),
+        { title: 'TN5250: Macro step', placeHolder: 'The key to press' },
+      );
+      return pick ? { type: 'key', action: pick.action } : undefined;
+    }
+    case 'wait': {
+      const ms = await number('How long to wait, in milliseconds', current?.type === 'wait' ? current.ms : 500);
+      return ms === undefined ? undefined : { type: 'wait', ms };
+    }
+    case 'waitInput':
+      return { type: 'waitInput' };
+    case 'waitText': {
+      const t = await text('Text that must appear on the screen', current?.type === 'waitText' ? current.text : '');
+      if (t === undefined) return undefined;
+      const ms = await number('How long to wait for it, in milliseconds (0 = the default, 20 s)', current?.type === 'waitText' ? (current.timeoutMs ?? 0) : 0);
+      if (ms === undefined) return undefined;
+      return ms > 0 ? { type: 'waitText', text: t, timeoutMs: ms } : { type: 'waitText', text: t };
+    }
+    case 'prompt': {
+      const label = await vscode.window.showInputBox({ title: 'TN5250: Macro step', prompt: 'What to ask for (shown as the prompt)', value: current?.type === 'prompt' ? current.label : '', ignoreFocusOut: true });
+      if (label === undefined) return undefined;
+      const hidden = await vscode.window.showQuickPick([{ label: 'Hide what is typed (a password)', secret: true }, { label: 'Show it', secret: false }], { title: 'TN5250: Macro step', placeHolder: 'How to take the answer' });
+      if (!hidden) return undefined;
+      return hidden.secret ? { type: 'prompt', label, secret: true } : { type: 'prompt', label };
+    }
+  }
+}
+
+const STEP_KINDS: Array<{ label: string; stepType: MacroStep['type'] }> = [
+  { label: '$(symbol-text) Type text', stepType: 'text' },
+  { label: '$(keyboard) Press a key', stepType: 'key' },
+  { label: '$(watch) Wait for the host to accept input', stepType: 'waitInput' },
+  { label: '$(clock) Wait (milliseconds)', stepType: 'wait' },
+  { label: '$(eye) Wait for a text on the screen', stepType: 'waitText' },
+  { label: '$(question) Ask for a value and type it', stepType: 'prompt' },
+];
+
+async function pickKind(): Promise<MacroStep['type'] | undefined> {
+  const pick = await vscode.window.showQuickPick(STEP_KINDS, { title: 'TN5250: Add a step', placeHolder: 'What the step does' });
+  return pick?.stepType;
+}
+
+/** Edits the steps of a macro with lists and input boxes (the desktop app has a graphical editor). */
+async function editSteps(original: Macro): Promise<void> {
+  const macro: Macro = { ...original, steps: original.steps.map((s) => ({ ...s })) };
+  for (;;) {
+    const rows = macro.steps.map((s, i) => ({ label: `${i + 1}. ${describeStep(s)}`, index: i }));
+    const pick = await vscode.window.showQuickPick(
+      [{ label: '$(add) Add a step at the end', index: -1 }, { label: '$(save) Save', index: -2 }, ...rows],
+      { title: `TN5250: steps of "${macro.name}"`, placeHolder: 'Pick a step to change it, or add one' },
+    );
+    if (!pick) return;
+    if (pick.index === -2) {
+      await macroStore.save(macro);
+      void vscode.window.showInformationMessage(`TN5250: macro "${macro.name}" saved (${macro.steps.length} step${macro.steps.length === 1 ? '' : 's'}).`);
+      return;
+    }
+    if (pick.index === -1) {
+      const kind = await pickKind();
+      if (!kind) continue;
+      const step = await askStep(kind);
+      if (step) macro.steps.push(step);
+      continue;
+    }
+    const i = pick.index;
+    const step = macro.steps[i] as MacroStep;
+    const action = await vscode.window.showQuickPick(
+      [
+        { label: '$(edit) Change', action: 'edit' },
+        { label: '$(arrow-up) Move up', action: 'up' },
+        { label: '$(arrow-down) Move down', action: 'down' },
+        { label: '$(insert) Insert a step after this one', action: 'insert' },
+        { label: '$(trash) Remove', action: 'remove' },
+      ],
+      { title: `TN5250: step ${i + 1}: ${describeStep(step)}` },
+    );
+    if (!action) continue;
+    switch (action.action) {
+      case 'edit': {
+        const edited = await askStep(step.type, step);
+        if (edited) macro.steps[i] = edited;
+        break;
+      }
+      case 'up':
+        if (i > 0) macro.steps.splice(i - 1, 2, step, macro.steps[i - 1] as MacroStep);
+        break;
+      case 'down':
+        if (i < macro.steps.length - 1) macro.steps.splice(i, 2, macro.steps[i + 1] as MacroStep, step);
+        break;
+      case 'insert': {
+        const kind = await pickKind();
+        if (!kind) break;
+        const added = await askStep(kind);
+        if (added) macro.steps.splice(i + 1, 0, added);
+        break;
+      }
+      case 'remove':
+        macro.steps.splice(i, 1);
+        break;
+    }
+  }
+}
+
 function macroItem(m: Macro): vscode.QuickPickItem & { macro: Macro } {
   return { label: m.name, description: m.key ? `$(keyboard) ${m.key}` : undefined, detail: `${m.steps.length} step${m.steps.length === 1 ? '' : 's'}: ${m.steps.slice(0, 4).map(describeStep).join(' · ')}${m.steps.length > 4 ? ' …' : ''}`, macro: m };
 }
@@ -202,9 +320,18 @@ export async function manageMacros(session: MacroSession | undefined, output: vs
   for (;;) {
     const macros = macroStore.list();
     const record = { label: '$(record) Record a new macro…', detail: session ? `In ${session.title}: what you type and press until TN5250: Stop Recording` : 'Open a terminal tab first', macro: undefined as Macro | undefined };
-    const pick = await vscode.window.showQuickPick([record, ...macros.map(macroItem)], { title: 'TN5250: Macros', placeHolder: macros.length ? 'Pick a macro' : 'No macros yet', matchOnDescription: true });
+    const blank = { label: '$(add) New empty macro…', detail: 'Name it, then add steps one by one', macro: undefined as Macro | undefined, blank: true };
+    const pick = await vscode.window.showQuickPick([record, blank, ...macros.map(macroItem)], { title: 'TN5250: Macros', placeHolder: macros.length ? 'Pick a macro' : 'No macros yet', matchOnDescription: true });
     if (!pick) return;
     if (!pick.macro) {
+      if ('blank' in pick) {
+        const fresh: Macro = { id: newMacroId(), name: '', key: '', steps: [] };
+        const name = await askName(fresh);
+        if (!name) continue;
+        fresh.name = name;
+        await editSteps(fresh);
+        continue;
+      }
       if (session) startRecording();
       return;
     }
@@ -214,7 +341,7 @@ export async function manageMacros(session: MacroSession | undefined, output: vs
         { label: '$(play) Run', action: 'run', description: session ? `in ${session.title}` : 'open a terminal tab first' },
         { label: '$(edit) Rename', action: 'rename' },
         { label: '$(keyboard) Change key', action: 'key', description: m.key || 'none' },
-        { label: '$(list-ordered) Show steps', action: 'steps' },
+        { label: '$(list-ordered) Edit steps', action: 'steps' },
         { label: '$(trash) Delete', action: 'delete' },
       ],
       { title: `TN5250: Macro "${m.name}"` },
@@ -235,7 +362,7 @@ export async function manageMacros(session: MacroSession | undefined, output: vs
         break;
       }
       case 'steps':
-        await vscode.window.showQuickPick(m.steps.map((s, i) => ({ label: `${i + 1}. ${describeStep(s)}` })), { title: `TN5250: steps of "${m.name}"`, placeHolder: 'The desktop app edits steps; here they are recorded again to change them' });
+        await editSteps(m);
         break;
       case 'delete':
         if ((await vscode.window.showWarningMessage(`Delete macro "${m.name}"?`, { modal: true }, 'Delete')) === 'Delete') await macroStore.remove(m.id);
