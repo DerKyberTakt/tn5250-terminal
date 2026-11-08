@@ -6,6 +6,8 @@ import type { HostToWebview, WebviewToHost } from '../shared/protocol';
 import { DEFAULT_OIA } from '../shared/protocol';
 import { SETTINGS_DEFAULTS, buildTitle, type TerminalSettings } from '../shared/settings';
 import { signonGate } from '../shared/signonGate';
+import type { MacroRecorder } from '../shared/macros';
+import { macroStore, runMacroKey, type MacroSession } from './macros';
 import { signonUser, type HistoryEntry } from '../shared/history';
 import * as path from 'node:path';
 import { buildDemoScreen } from '../engine/demoScreen';
@@ -428,6 +430,25 @@ Trust it only if this fingerprint matches what the system administrator shows fo
   }
 
   /** Appearance and keyboard follow the live settings; connection values stay as the tab was opened. */
+  /** Set while TN5250: Record Macro runs in this tab: every key and text goes into it. */
+  recorder: MacroRecorder | undefined;
+
+  /** What a macro needs from this tab. */
+  macroSession(): MacroSession {
+    return {
+      title: this.title,
+      type: (text) => this.controller?.type(text),
+      press: (action) => this.controller?.press(action),
+      inputAllowed: () => this.controller?.inputAllowed === true,
+      screenText: () => this.controller?.screenText() ?? '',
+    };
+  }
+
+  /** The macro keys changed: tell the page. */
+  refreshConfig(): void {
+    this.pushConfig();
+  }
+
   private pushConfig(): void {
     const settings = this.liveSettings();
     this.refreshTitle();
@@ -435,7 +456,7 @@ Trust it only if this fingerprint matches what the system administrator shows fo
       const fontFace = settings.fontFile && settings.fontFamily
         ? { family: settings.fontFamily, url: this.panel.webview.asWebviewUri(vscode.Uri.file(settings.fontFile)).toString() }
         : undefined;
-      this.post({ type: 'config', config: { settings, keyOverlay: this.keyOverlay, host: 'vscode', watermarkImageData, fontFace } });
+      this.post({ type: 'config', config: { settings, keyOverlay: this.keyOverlay, host: 'vscode', watermarkImageData, fontFace, macroKeys: macroStore.keys() } });
     });
   }
 
@@ -496,10 +517,15 @@ Trust it only if this fingerprint matches what the system administrator shows fo
         break;
       case 'action':
         if (msg.action === 'enter') this.noteSignon();
+        this.recorder?.key(msg.action);
         this.controller?.press(msg.action);
         break;
       case 'text':
+        this.recorder?.text(msg.text);
         this.controller?.type(msg.text);
+        break;
+      case 'macro':
+        if (!runMacroKey(msg.key, this.macroSession(), this.output)) this.output.appendLine(`no macro on ${msg.key}`);
         break;
       case 'click':
         this.controller?.setCursor(msg.row, msg.col);

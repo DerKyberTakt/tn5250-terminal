@@ -140,6 +140,31 @@
         "category": "TN5250"
       },
       {
+        "command": "tn5250.macros",
+        "title": "Macros",
+        "category": "TN5250"
+      },
+      {
+        "command": "tn5250.recordMacro",
+        "title": "Record Macro",
+        "category": "TN5250"
+      },
+      {
+        "command": "tn5250.stopRecording",
+        "title": "Stop Recording",
+        "category": "TN5250"
+      },
+      {
+        "command": "tn5250.runMacro",
+        "title": "Run Macro",
+        "category": "TN5250"
+      },
+      {
+        "command": "tn5250.stopMacro",
+        "title": "Stop Macro",
+        "category": "TN5250"
+      },
+      {
         "command": "tn5250.setPassword",
         "title": "Set Sign-On Password (defaults)",
         "category": "TN5250"
@@ -342,6 +367,11 @@
           "command": "tn5250.importConnections",
           "when": "view == tn5250.sessions",
           "group": "1_import@1"
+        },
+        {
+          "command": "tn5250.macros",
+          "when": "view == tn5250.sessions",
+          "group": "1_import@2"
         }
       ],
       "view/item/context": [

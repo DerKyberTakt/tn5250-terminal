@@ -39,7 +39,9 @@ The Keyboard settings page with the visual keyboard:
 
 Already have your systems in ACS or Code for IBM i? **Import Connections** (in the view's `...` menu, or the Command Palette) reads the ACS session profiles (`.hod`) from `Documents\IBM\iAccessClient\Emulator` or any folder you pick, or the Code for IBM i connection list, and adds the ones you select. From ACS it brings the connection (host, port, TLS, screen size, code page, workstation name, user profile), auto-connect, auto-reconnect, keep-alive and the connection timeout, and the display, paste, hotspot, mouse wheel, sound and keyboard options that have a match here, field colors included; from Code for IBM i, the name, host and user profile. 5250 printer, 3270 and VT profiles are left out. A connection that is already saved is not touched without asking: you choose between updating it from the profile (the profile's values win, and what you set only here, such as a trusted certificate, stays) and leaving it as it is. Undo is offered after every import. Passwords are never imported: set them once with Set Password.
 
-Useful commands (Command Palette, prefix **TN5250:**): Settings, New Tab (same session), Connect to Previous IBM i, Disconnect, Disconnect All, Print Screen, Import Connections, Import ACS Keyboard Map, Save Session Trace.
+Useful commands (Command Palette, prefix **TN5250:**): Settings, New Tab (same session), Connect to Previous IBM i, Disconnect, Disconnect All, Print Screen, Import Connections, Import ACS Keyboard Map, Macros, Record Macro, Run Macro, Save Session Trace.
+
+**Macros**: TN5250: Record Macro records what you type and press in the active tab; TN5250: Stop Recording asks for a name and a key (a function key or a combination with Ctrl, Alt or Meta). The macro then runs from that key in any tab, or from TN5250: Run Macro. After Enter or a function key the macro waits for the host to accept input again. Passwords do not belong in a macro.
 
 ## Keyboard
 
