@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 - unreleased
+
+- Import Connections (Command Palette, the Sessions view `...` menu, the empty view): reads ACS 5250 display session profiles (`.hod`) from `Documents\IBM\iAccessClient\Emulator` or any `.hod` files you pick, or the Code for IBM i connection list, and adds the ones you select; a connection already saved is updated in place, passwords are never read. Contributed by Juan Concepcion (#7).
+
 ## 0.2.1 - 2026-11-08
 
 - Fixed: Actions > Print (host) left the session in X SYSTEM. The host answers the Print key with Read Screen (to Print), X'66', which was not recognised; it now gets the screen image like Read Screen, and the host spools it.
