@@ -160,8 +160,16 @@ export interface MacroTarget {
   prompt(label: string, secret: boolean): Promise<string | undefined>;
 }
 
+/** The part of an AbortSignal a run looks at (shared code has no DOM or Node typings). */
+export interface StopSignal {
+  readonly aborted: boolean;
+}
+
+/** Timers without assuming a DOM or Node typing in shared code. */
+const timers = globalThis as unknown as { setTimeout(fn: () => void, ms: number): unknown };
+
 export interface RunOptions {
-  signal?: AbortSignal;
+  signal?: StopSignal;
   /** How often the waits look at the session. */
   pollMs?: number;
   /** How long a wait for input or for a text may take before the macro stops. */
@@ -174,7 +182,7 @@ export interface RunOptions {
 
 export type RunResult = { ok: true } | { ok: false; step: number; reason: string };
 
-const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => timers.setTimeout(resolve, ms));
 
 /**
  * Plays a macro. A wait for input first gives the host a moment to lock the keyboard
