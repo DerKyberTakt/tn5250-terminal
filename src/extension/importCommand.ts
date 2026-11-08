@@ -24,6 +24,31 @@ export interface ImportOutcome {
   imported: number;
   /** Index of the first imported connection in the saved list. */
   firstIndex: number;
+  /** The saved list as it was before the import, for Undo. */
+  previous: SessionOverrides[];
+}
+
+/**
+ * Asks what to do with the selected connections that are already saved. Undefined when
+ * the user backs out; otherwise whether the saved entries are updated from the profiles.
+ */
+async function askAboutSaved(count: number): Promise<boolean | undefined> {
+  const update = {
+    label: `$(sync) Update the ${plural(count, 'saved connection')} from the profiles`,
+    detail: "The profile's values win; a trusted certificate, demo mode and bypass sign-on stay. Undo is offered afterwards.",
+    update: true,
+  };
+  const keep = {
+    label: `$(lock) Keep the ${plural(count, 'saved connection')} as ${count === 1 ? 'it is' : 'they are'}`,
+    detail: 'Only the new connections are added; nothing already saved changes.',
+    update: false,
+  };
+  const pick = await vscode.window.showQuickPick([update, keep], {
+    title: 'TN5250: Import Connections',
+    placeHolder: `${plural(count, 'selected connection')} ${count === 1 ? 'is' : 'are'} already saved`,
+    ignoreFocusOut: true,
+  });
+  return pick?.update;
 }
 
 type Source = 'acs' | 'files' | 'c4i';
@@ -163,7 +188,7 @@ export async function importConnectionsInteractive(): Promise<ImportOutcome | un
   const unreadable = found.skipped.filter((s) => s.reason === 'could not be read').length;
   const unreadableNote = unreadable ? ` ${plural(unreadable, 'file')} could not be read.` : '';
   if (!found.sessions.length) {
-    return { message: `TN5250: no 5250 display sessions found.${unreadableNote}`, imported: 0, firstIndex: -1 };
+    return { message: `TN5250: no 5250 display sessions found.${unreadableNote}`, imported: 0, firstIndex: -1, previous: readSessions() };
   }
 
   // Every display session is offered and selected; one already saved replaces the saved
@@ -188,13 +213,27 @@ export async function importConnectionsInteractive(): Promise<ImportOutcome | un
   });
   if (!chosen?.length) return undefined;
 
-  const merged = mergeImported(readSessions(), chosen.map((c) => c.session));
-  await writeSessions(merged.sessions);
+  // Nothing already saved changes without a word: ask first, and keep the old list for Undo.
+  const previous = readSessions();
+  const alreadySaved = chosen.filter((c) => isSaved(previous, c.session)).length;
+  let updateSaved = true;
+  if (alreadySaved) {
+    const answer = await askAboutSaved(alreadySaved);
+    if (answer === undefined) return undefined;
+    updateSaved = answer;
+  }
+  const merged = mergeImported(previous, chosen.map((c) => c.session), { updateSaved });
   const n = merged.touched.length;
-  const replaced = merged.replaced.length ? ` (${merged.replaced.length} replaced saved ones)` : '';
+  if (!n) {
+    return { message: `TN5250: nothing imported: the ${plural(merged.skipped.length, 'selected connection')} ${merged.skipped.length === 1 ? 'is' : 'are'} already saved.`, imported: 0, firstIndex: -1, previous };
+  }
+  await writeSessions(merged.sessions);
+  const replaced = merged.replaced.length ? ` (${merged.replaced.length} updated)` : '';
+  const skipped = merged.skipped.length ? ` ${plural(merged.skipped.length, 'saved connection')} left as ${merged.skipped.length === 1 ? 'it was' : 'they were'}.` : '';
   return {
-    message: `TN5250: ${plural(n, 'connection')} imported${replaced}.${unreadableNote}`,
+    message: `TN5250: ${plural(n, 'connection')} imported${replaced}.${skipped}${unreadableNote}`,
     imported: n,
     firstIndex: merged.touched[0] ?? -1,
+    previous,
   };
 }

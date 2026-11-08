@@ -187,8 +187,14 @@ export function activate(context: vscode.ExtensionContext): void {
       return;
     }
     sessions.refresh();
-    const open = await vscode.window.showInformationMessage(outcome.message, 'Open Settings');
-    if (open) SettingsPanel.show(context, output, outcome.firstIndex);
+    const choice = await vscode.window.showInformationMessage(outcome.message, 'Open Settings', 'Undo');
+    if (choice === 'Open Settings') SettingsPanel.show(context, output, outcome.firstIndex);
+    if (choice === 'Undo') {
+      // The saved list as it was before the import; the import changed nothing else.
+      await writeSessions(outcome.previous);
+      sessions.refresh();
+      void vscode.window.showInformationMessage('TN5250: import undone, the connections are as they were.');
+    }
   });
   register('tn5250.setPassword', () => setPasswordInteractive(context, -1));
   register('tn5250.printScreen', async () => {

@@ -2,7 +2,8 @@
 
 ## 0.2.2 - unreleased
 
-- Import Connections (Command Palette, the Sessions view `...` menu, the empty view): reads ACS 5250 display session profiles (`.hod`) from `Documents\IBM\iAccessClient\Emulator` or any `.hod` files you pick, or the Code for IBM i connection list, and adds the ones you select; a connection already saved is updated in place, passwords are never read. Contributed by Juan Concepcion (#7).
+- The euro code pages 1140-1149 announce the euro keyboard types CRTDEVDSP lists for them (USE, AGE, DME, FNE, ITE, SPE, UKE, FAE, ICE) instead of the plain ones; 1148 keeps INB, IBM lists no euro keyboard for International.
+- Import Connections (Command Palette, the Sessions view `...` menu, the empty view): reads ACS 5250 display session profiles (`.hod`) from `Documents\IBM\iAccessClient\Emulator` or any `.hod` files you pick, or the Code for IBM i connection list, and adds the ones you select; a connection already saved is updated from the profile or left alone, your choice, and Undo is offered after the import; passwords are never read. Contributed by Juan Concepcion (#7).
 
 ## 0.2.1 - 2026-11-08
 
