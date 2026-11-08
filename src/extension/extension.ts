@@ -7,7 +7,7 @@ import { resolveSettings } from '../shared/settings';
 import { readDefaults, readSessions, removeSessionAt, resolvedSessions, writeSessions } from './settingsStore';
 import { importKmpInteractive } from './kmpCommand';
 import { importConnectionsInteractive } from './importCommand';
-import { MacroRecorder } from '../shared/macros';
+import { watchRecording, MacroRecorder } from '../shared/macros';
 import { macroStore, manageMacros, pickAndRun, saveRecordedMacro, stopMacro } from './macros';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
 
@@ -203,6 +203,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Macros: recorded in the active tab, run by key or from the lists.
   macroStore.init(context);
   const recording = (): TerminalPanel | undefined => [...TerminalPanel.open].find((p) => p.recorder);
+  let recordingWatch: (() => void) | undefined;
   const startRecording = (): void => {
     const panel = TerminalPanel.active;
     if (!panel?.profile) {
@@ -214,10 +215,21 @@ export function activate(context: vscode.ExtensionContext): void {
       return;
     }
     panel.recorder = new MacroRecorder();
+    // A forgotten recording: a reminder every 5 minutes, and an end after 5 minutes without a keystroke.
+    recordingWatch = watchRecording(panel.recorder, {
+      onIdle: () => {
+        if (!recording()) return;
+        void vscode.window.showWarningMessage('TN5250: recording stopped, nothing typed for 5 minutes.');
+        void vscode.commands.executeCommand('tn5250.stopRecording');
+      },
+      onReminder: (minutes) => void vscode.window.showWarningMessage(`TN5250: still recording a macro (${minutes} min). Run TN5250: Stop Recording when done.`),
+    });
     void vscode.window.showInformationMessage(`TN5250: recording in ${panel.title}. What you type and press goes into the macro; run TN5250: Stop Recording when done.`);
   };
   register('tn5250.recordMacro', startRecording);
   register('tn5250.stopRecording', async () => {
+    recordingWatch?.();
+    recordingWatch = undefined;
     const panel = recording();
     if (!panel?.recorder) {
       void vscode.window.showInformationMessage('TN5250: no recording is running.');
