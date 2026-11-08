@@ -118,8 +118,10 @@ const KEY_RULE = /^(?:(?:Ctrl|Alt|Meta|Shift)\+)*(?:F\d{1,2}|[^\s+]+)$/;
 function validateKey(value: string, others: Macro[], self: Macro): string | undefined {
   const key = value.trim();
   if (!key) return undefined;
-  if (!KEY_RULE.test(key)) return 'Modifiers then the key, as "Ctrl+Shift+1", "Alt+F5" or "F24".';
+  if (!KEY_RULE.test(key)) return 'Modifiers then the key, as "Ctrl+Alt+1", "Alt+F5" or "F24".';
   if (!/^(?:Ctrl|Alt|Meta)\+/.test(key) && !/^(?:Shift\+)?F\d{1,2}$/.test(key)) return 'Use a function key, or a combination with Ctrl, Alt or Meta, so typing is not affected.';
+  // A character key carries its shift state in the character: Shift+1 arrives as "!".
+  if (/Shift\+[^+]$/.test(key)) return 'With Shift, name the character the key produces instead: "Ctrl+!" for Ctrl+Shift+1.';
   const taken = others.find((o) => o.id !== self.id && o.key === key);
   return taken ? `${key} already runs "${taken.name}".` : undefined;
 }
@@ -144,7 +146,7 @@ async function askKey(macro: Macro): Promise<string | undefined> {
   const others = macroStore.list();
   const value = await vscode.window.showInputBox({
     title: 'TN5250: Macro key',
-    prompt: 'The key that runs it, as "Ctrl+Shift+1" or "Alt+F5"; empty for none. It wins over the keyboard map.',
+    prompt: 'The key that runs it, as "Ctrl+Alt+1", "Alt+F5" or "Ctrl+Shift+F5"; empty for none. It wins over the keyboard map.',
     value: macro.key,
     ignoreFocusOut: true,
     validateInput: (v) => validateKey(normalizeKey(v), others, macro),
