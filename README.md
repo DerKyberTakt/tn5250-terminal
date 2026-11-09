@@ -41,7 +41,7 @@ Already have your systems in ACS or Code for IBM i? **Import Connections** (in t
 
 Useful commands (Command Palette, prefix **TN5250:**): Settings, New Tab (same session), Connect to Previous IBM i, Disconnect, Disconnect All, Print Screen, Import Connections, Import ACS Keyboard Map, Macros, Record Macro, Run Macro, Save Session Trace.
 
-**Macros**: TN5250: Record Macro records what you type and press in the active tab; TN5250: Stop Recording asks for a name and a key (a function key or a combination with Ctrl, Alt or Meta). The macro then runs from that key in any tab, or from TN5250: Run Macro. After Enter or a function key the macro waits for the host to accept input again. Passwords do not belong in a macro.
+**Macros**: the Macros view in the side bar lists them with play, pencil and trash on each row and New, Record, Import and Export on its title bar. TN5250: Record Macro records what you type and press in the active tab; TN5250: Stop Recording asks for a name and a key (a function key or a combination with Ctrl, Alt or Meta). The macro then runs from that key in any tab, or from TN5250: Run Macro. After Enter or a function key the macro waits for the host to accept input again. Passwords do not belong in a macro.
 
 ## Keyboard
 
