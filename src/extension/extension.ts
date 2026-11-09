@@ -6,6 +6,9 @@ import { HistoryItem, HistoryProvider, HistoryStore, detailRows } from './histor
 import { resolveSettings } from '../shared/settings';
 import { readDefaults, readSessions, removeSessionAt, resolvedSessions, writeSessions } from './settingsStore';
 import { importKmpInteractive } from './kmpCommand';
+import { importConnectionsInteractive } from './importCommand';
+import { watchRecording, MacroRecorder } from '../shared/macros';
+import { macroStore, manageMacros, pickAndRun, saveRecordedMacro, stopMacro } from './macros';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
 
 const LAST_SESSION_KEY = 'tn5250.lastSession';
@@ -178,7 +181,68 @@ export function activate(context: vscode.ExtensionContext): void {
     for (const p of open) p.disconnect();
   });
   register('tn5250.importKmp', () => importKmpInteractive(-1));
+  register('tn5250.importConnections', async () => {
+    const outcome = await importConnectionsInteractive();
+    if (!outcome) return;
+    if (!outcome.imported) {
+      void vscode.window.showInformationMessage(outcome.message);
+      return;
+    }
+    sessions.refresh();
+    const choice = await vscode.window.showInformationMessage(outcome.message, 'Open Settings', 'Undo');
+    if (choice === 'Open Settings') SettingsPanel.show(context, output, outcome.firstIndex);
+    if (choice === 'Undo') {
+      // The saved list as it was before the import; the import changed nothing else.
+      await writeSessions(outcome.previous);
+      sessions.refresh();
+      void vscode.window.showInformationMessage('TN5250: import undone, the connections are as they were.');
+    }
+  });
   register('tn5250.setPassword', () => setPasswordInteractive(context, -1));
+
+  // Macros: recorded in the active tab, run by key or from the lists.
+  macroStore.init(context);
+  const recording = (): TerminalPanel | undefined => [...TerminalPanel.open].find((p) => p.recorder);
+  let recordingWatch: (() => void) | undefined;
+  const startRecording = (): void => {
+    const panel = TerminalPanel.active;
+    if (!panel?.profile) {
+      void vscode.window.showInformationMessage('TN5250: open a terminal tab first.');
+      return;
+    }
+    if (recording()) {
+      void vscode.window.showInformationMessage('TN5250: a recording is already running; stop it first.');
+      return;
+    }
+    panel.recorder = new MacroRecorder();
+    // A forgotten recording: a reminder every 5 minutes, and an end after 5 minutes without a keystroke.
+    recordingWatch = watchRecording(panel.recorder, {
+      onIdle: () => {
+        if (!recording()) return;
+        void vscode.window.showWarningMessage('TN5250: recording stopped, nothing typed for 5 minutes.');
+        void vscode.commands.executeCommand('tn5250.stopRecording');
+      },
+      onReminder: (minutes) => void vscode.window.showWarningMessage(`TN5250: still recording a macro (${minutes} min). Run TN5250: Stop Recording when done.`),
+    });
+    void vscode.window.showInformationMessage(`TN5250: recording in ${panel.title}. What you type and press goes into the macro; run TN5250: Stop Recording when done.`);
+  };
+  register('tn5250.recordMacro', startRecording);
+  register('tn5250.stopRecording', async () => {
+    recordingWatch?.();
+    recordingWatch = undefined;
+    const panel = recording();
+    if (!panel?.recorder) {
+      void vscode.window.showInformationMessage('TN5250: no recording is running.');
+      return;
+    }
+    const recorder = panel.recorder;
+    panel.recorder = undefined;
+    await saveRecordedMacro(recorder);
+  });
+  register('tn5250.runMacro', () => pickAndRun(TerminalPanel.active?.profile ? TerminalPanel.active.macroSession() : undefined, output));
+  register('tn5250.stopMacro', () => stopMacro());
+  register('tn5250.macros', () => manageMacros(TerminalPanel.active?.profile ? TerminalPanel.active.macroSession() : undefined, output, startRecording));
+  context.subscriptions.push(macroStore.onDidChange(() => [...TerminalPanel.open].forEach((p) => p.refreshConfig())));
   register('tn5250.printScreen', async () => {
     const text = TerminalPanel.active?.screenText();
     if (text === undefined) {

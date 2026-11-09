@@ -5,8 +5,8 @@ import * as vscode from 'vscode';
 import { importKmp } from '../shared/kmpImport';
 import { readDefaults, readSessions, writeDefaults, writeSessions } from './settingsStore';
 
-/** Where ACS keeps its keyboard maps; the picker opens there when the folder exists. */
-function acsEmulatorDir(): vscode.Uri | undefined {
+/** Where ACS keeps its keyboard maps and session profiles; the pickers open there when the folder exists. */
+export function acsEmulatorDir(): vscode.Uri | undefined {
   const dir = path.join(os.homedir(), 'Documents', 'IBM', 'iAccessClient', 'Emulator');
   return fs.existsSync(dir) ? vscode.Uri.file(dir) : undefined;
 }
