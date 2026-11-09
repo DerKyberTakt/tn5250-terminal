@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.3 - unreleased
+- Settings > Connection has an Import Connections… button (ACS session profiles or Code for IBM i), the same import as the Sessions view.
+
 ## 0.2.2 - 2026-11-08
 
 - A Macros view in the TN5250 side bar, under Sessions: every macro with its key and step count, play / pencil / trash on each row, New, Record (Stop Recording while one runs), Import and Export on its title bar.
