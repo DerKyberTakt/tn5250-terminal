@@ -304,7 +304,7 @@ async function editSteps(original: Macro): Promise<void> {
 const MACRO_FILE_FILTER = { 'TN5250 macros': ['json'] };
 
 /** Writes every macro to a .json file the desktop app and other VS Code installs can import. */
-async function exportMacros(): Promise<void> {
+export async function exportMacros(): Promise<void> {
   const macros = macroStore.list();
   if (!macros.length) {
     void vscode.window.showInformationMessage('TN5250: no macros to export.');
@@ -317,7 +317,7 @@ async function exportMacros(): Promise<void> {
 }
 
 /** Reads a macros .json file: the same id replaces, a key another macro has is dropped. */
-async function importMacros(): Promise<void> {
+export async function importMacros(): Promise<void> {
   const picked = await vscode.window.showOpenDialog({ title: 'Import macros', filters: MACRO_FILE_FILTER, canSelectMany: false });
   const file = picked?.[0];
   if (!file) return;
@@ -352,7 +352,61 @@ export async function pickAndRun(session: MacroSession | undefined, output: vsco
   if (pick) void playMacro(pick.macro, session, output);
 }
 
-/** TN5250: Macros: the list, with run, rename, key, steps and delete. */
+/** New Macro: a name, then the step list. */
+export async function newEmptyMacro(): Promise<void> {
+  const fresh: Macro = { id: newMacroId(), name: '', key: '', steps: [] };
+  const name = await askName(fresh);
+  if (!name) return;
+  fresh.name = name;
+  await editSteps(fresh);
+}
+
+/** Delete, after asking. */
+export async function deleteMacro(m: Macro): Promise<void> {
+  if ((await vscode.window.showWarningMessage(`Delete macro "${m.name}"?`, { modal: true }, 'Delete')) === 'Delete') await macroStore.remove(m.id);
+}
+
+/**
+ * What can be done with one macro (the pencil in the Macros view, a pick in TN5250: Macros):
+ * run, rename, change the key, edit the steps, delete. True when it was run.
+ */
+export async function macroActions(m: Macro, session: MacroSession | undefined, output: vscode.OutputChannel): Promise<boolean> {
+  const action = await vscode.window.showQuickPick(
+    [
+      { label: '$(play) Run', action: 'run', description: session ? `in ${session.title}` : 'open a terminal tab first' },
+      { label: '$(edit) Rename', action: 'rename' },
+      { label: '$(keyboard) Change key', action: 'key', description: m.key || 'none' },
+      { label: '$(list-ordered) Edit steps', action: 'steps' },
+      { label: '$(trash) Delete', action: 'delete' },
+    ],
+    { title: `TN5250: Macro "${m.name}"` },
+  );
+  if (!action) return false;
+  switch (action.action) {
+    case 'run':
+      if (session) void playMacro(m, session, output);
+      return !!session;
+    case 'rename': {
+      const name = await askName(m);
+      if (name) await macroStore.save({ ...m, name });
+      break;
+    }
+    case 'key': {
+      const key = await askKey(m);
+      if (key !== undefined) await macroStore.save({ ...m, key });
+      break;
+    }
+    case 'steps':
+      await editSteps(m);
+      break;
+    case 'delete':
+      await deleteMacro(m);
+      break;
+  }
+  return false;
+}
+
+/** TN5250: Macros: the list, with run, rename, key, steps and delete (the Macros view does the same with icons). */
 export async function manageMacros(session: MacroSession | undefined, output: vscode.OutputChannel, startRecording: () => void): Promise<void> {
   for (;;) {
     const macros = macroStore.list();
@@ -371,48 +425,12 @@ export async function manageMacros(session: MacroSession | undefined, output: vs
         continue;
       }
       if ('blank' in pick) {
-        const fresh: Macro = { id: newMacroId(), name: '', key: '', steps: [] };
-        const name = await askName(fresh);
-        if (!name) continue;
-        fresh.name = name;
-        await editSteps(fresh);
+        await newEmptyMacro();
         continue;
       }
       if (session) startRecording();
       return;
     }
-    const m = pick.macro;
-    const action = await vscode.window.showQuickPick(
-      [
-        { label: '$(play) Run', action: 'run', description: session ? `in ${session.title}` : 'open a terminal tab first' },
-        { label: '$(edit) Rename', action: 'rename' },
-        { label: '$(keyboard) Change key', action: 'key', description: m.key || 'none' },
-        { label: '$(list-ordered) Edit steps', action: 'steps' },
-        { label: '$(trash) Delete', action: 'delete' },
-      ],
-      { title: `TN5250: Macro "${m.name}"` },
-    );
-    if (!action) continue;
-    switch (action.action) {
-      case 'run':
-        if (session) void playMacro(m, session, output);
-        return;
-      case 'rename': {
-        const name = await askName(m);
-        if (name) await macroStore.save({ ...m, name });
-        break;
-      }
-      case 'key': {
-        const key = await askKey(m);
-        if (key !== undefined) await macroStore.save({ ...m, key });
-        break;
-      }
-      case 'steps':
-        await editSteps(m);
-        break;
-      case 'delete':
-        if ((await vscode.window.showWarningMessage(`Delete macro "${m.name}"?`, { modal: true }, 'Delete')) === 'Delete') await macroStore.remove(m.id);
-        break;
-    }
+    if (await macroActions(pick.macro, session, output)) return;
   }
 }

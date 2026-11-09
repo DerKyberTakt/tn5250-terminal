@@ -142,17 +142,20 @@
       {
         "command": "tn5250.macros",
         "title": "Macros",
-        "category": "TN5250"
+        "category": "TN5250",
+        "icon": "$(list-unordered)"
       },
       {
         "command": "tn5250.recordMacro",
         "title": "Record Macro",
-        "category": "TN5250"
+        "category": "TN5250",
+        "icon": "$(record)"
       },
       {
         "command": "tn5250.stopRecording",
         "title": "Stop Recording",
-        "category": "TN5250"
+        "category": "TN5250",
+        "icon": "$(debug-stop)"
       },
       {
         "command": "tn5250.runMacro",
@@ -163,6 +166,42 @@
         "command": "tn5250.stopMacro",
         "title": "Stop Macro",
         "category": "TN5250"
+      },
+      {
+        "command": "tn5250.newMacro",
+        "title": "New Macro",
+        "category": "TN5250",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "tn5250.importMacros",
+        "title": "Import Macros",
+        "category": "TN5250",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "tn5250.exportMacros",
+        "title": "Export Macros",
+        "category": "TN5250",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "tn5250.runMacroItem",
+        "title": "Run",
+        "category": "TN5250",
+        "icon": "$(play)"
+      },
+      {
+        "command": "tn5250.editMacroItem",
+        "title": "Edit",
+        "category": "TN5250",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "tn5250.deleteMacroItem",
+        "title": "Delete",
+        "category": "TN5250",
+        "icon": "$(trash)"
       },
       {
         "command": "tn5250.setPassword",
@@ -325,6 +364,18 @@
         {
           "command": "tn5250.duplicateSession",
           "when": "false"
+        },
+        {
+          "command": "tn5250.runMacroItem",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.editMacroItem",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.deleteMacroItem",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -369,9 +420,39 @@
           "group": "1_import@1"
         },
         {
+          "command": "tn5250.newMacro",
+          "when": "view == tn5250.macrosView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "tn5250.recordMacro",
+          "when": "view == tn5250.macrosView && !tn5250.recording",
+          "group": "navigation@2"
+        },
+        {
+          "command": "tn5250.stopRecording",
+          "when": "view == tn5250.macrosView && tn5250.recording",
+          "group": "navigation@2"
+        },
+        {
+          "command": "tn5250.importMacros",
+          "when": "view == tn5250.macrosView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "tn5250.exportMacros",
+          "when": "view == tn5250.macrosView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "tn5250.runMacro",
+          "when": "view == tn5250.macrosView",
+          "group": "1_more@1"
+        },
+        {
           "command": "tn5250.macros",
-          "when": "view == tn5250.sessions",
-          "group": "1_import@2"
+          "when": "view == tn5250.macrosView",
+          "group": "1_more@2"
         }
       ],
       "view/item/context": [
@@ -418,6 +499,21 @@
         {
           "command": "tn5250.historyRemove",
           "when": "view == tn5250.history && viewItem =~ /^history/",
+          "group": "inline@3"
+        },
+        {
+          "command": "tn5250.runMacroItem",
+          "when": "view == tn5250.macrosView && viewItem == macro",
+          "group": "inline@1"
+        },
+        {
+          "command": "tn5250.editMacroItem",
+          "when": "view == tn5250.macrosView && viewItem == macro",
+          "group": "inline@2"
+        },
+        {
+          "command": "tn5250.deleteMacroItem",
+          "when": "view == tn5250.macrosView && viewItem == macro",
           "group": "inline@3"
         }
       ]
@@ -1797,6 +1893,12 @@
           "contextualTitle": "TN5250 Sessions"
         },
         {
+          "id": "tn5250.macrosView",
+          "name": "Macros",
+          "icon": "media/sidebar.svg",
+          "contextualTitle": "TN5250 Macros"
+        },
+        {
           "id": "tn5250.history",
           "name": "History",
           "icon": "media/sidebar.svg",
@@ -1809,6 +1911,10 @@
       {
         "view": "tn5250.sessions",
         "contents": "No connections yet.\n[New Connection](command:tn5250.newConnection)\n[Import Connections](command:tn5250.importConnections)\nFrom ACS session profiles or Code for IBM i.\n[Settings](command:tn5250.openSettings)"
+      },
+      {
+        "view": "tn5250.macrosView",
+        "contents": "No macros yet.\n[Record Macro](command:tn5250.recordMacro)\nWhat you type and press in the active tab, until TN5250: Stop Recording.\n[New Macro](command:tn5250.newMacro)\n[Import Macros](command:tn5250.importMacros)\nA .json file exported here or from the desktop app."
       }
     ]
   },

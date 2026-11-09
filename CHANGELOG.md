@@ -2,6 +2,7 @@
 
 ## 0.2.2 - 2026-11-08
 
+- A Macros view in the TN5250 side bar, under Sessions: every macro with its key and step count, play / pencil / trash on each row, New, Record (Stop Recording while one runs), Import and Export on its title bar.
 - A macro recording reminds you every 5 minutes that it is still on and ends by itself after 5 minutes without a keystroke.
 - Macros: TN5250: Record Macro records what you type and press in the active tab until TN5250: Stop Recording, then asks for a name and a key (a function key, or a combination with Ctrl, Alt or Meta, as "Ctrl+Alt+1" or "Ctrl+Shift+F5"); the macro runs from its key in any tab, from TN5250: Run Macro, or from TN5250: Macros (also in the Sessions view menu: run, rename, change the key, edit the steps with lists and input boxes, delete, build a new macro step by step, or import and export macros as a .json file the desktop app reads too). A key the host answers (Enter, a function key) is followed by a wait for the host to accept input, so a macro never types into a locked keyboard; TN5250: Stop Macro (or the status bar item) stops one. Macros are kept per VS Code install; the desktop app has the same macros with a step editor. Asked for by thomprl (#6).
 - Fixed: characters typed with AltGr (@, the euro sign, [ ] { } on German and other layouts) were dropped: Windows reports AltGr as Ctrl+Alt and the terminal passed the chord on. They are typed now; Ctrl+Alt chords with a letter or digit still pass through.

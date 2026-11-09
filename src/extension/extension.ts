@@ -8,7 +8,8 @@ import { readDefaults, readSessions, removeSessionAt, resolvedSessions, writeSes
 import { importKmpInteractive } from './kmpCommand';
 import { importConnectionsInteractive } from './importCommand';
 import { watchRecording, MacroRecorder } from '../shared/macros';
-import { macroStore, manageMacros, pickAndRun, saveRecordedMacro, stopMacro } from './macros';
+import { deleteMacro, exportMacros, importMacros, macroActions, macroStore, manageMacros, newEmptyMacro, pickAndRun, playMacro, saveRecordedMacro, stopMacro } from './macros';
+import { MacroItem, MacrosProvider } from './macrosView';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
 
 const LAST_SESSION_KEY = 'tn5250.lastSession';
@@ -200,9 +201,17 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   register('tn5250.setPassword', () => setPasswordInteractive(context, -1));
 
-  // Macros: recorded in the active tab, run by key or from the lists.
+  // Macros: recorded in the active tab, run by key, from the Macros view or from the lists.
   macroStore.init(context);
+  const macrosProvider = new MacrosProvider(context);
+  const macrosView = vscode.window.createTreeView('tn5250.macrosView', { treeDataProvider: macrosProvider });
+  macrosProvider.attach(macrosView);
+  context.subscriptions.push(macrosView);
+  const macroSession = (): ReturnType<TerminalPanel['macroSession']> | undefined => (TerminalPanel.active?.profile ? TerminalPanel.active.macroSession() : undefined);
   const recording = (): TerminalPanel | undefined => [...TerminalPanel.open].find((p) => p.recorder);
+  // The view's title bar shows Record or Stop Recording, by this context key.
+  const setRecordingContext = (on: boolean): void => void vscode.commands.executeCommand('setContext', 'tn5250.recording', on);
+  setRecordingContext(false);
   let recordingWatch: (() => void) | undefined;
   const startRecording = (): void => {
     const panel = TerminalPanel.active;
@@ -215,6 +224,7 @@ export function activate(context: vscode.ExtensionContext): void {
       return;
     }
     panel.recorder = new MacroRecorder();
+    setRecordingContext(true);
     // A forgotten recording: a reminder every 5 minutes, and an end after 5 minutes without a keystroke.
     recordingWatch = watchRecording(panel.recorder, {
       onIdle: () => {
@@ -230,6 +240,7 @@ export function activate(context: vscode.ExtensionContext): void {
   register('tn5250.stopRecording', async () => {
     recordingWatch?.();
     recordingWatch = undefined;
+    setRecordingContext(false);
     const panel = recording();
     if (!panel?.recorder) {
       void vscode.window.showInformationMessage('TN5250: no recording is running.');
@@ -239,9 +250,30 @@ export function activate(context: vscode.ExtensionContext): void {
     panel.recorder = undefined;
     await saveRecordedMacro(recorder);
   });
-  register('tn5250.runMacro', () => pickAndRun(TerminalPanel.active?.profile ? TerminalPanel.active.macroSession() : undefined, output));
+  register('tn5250.runMacro', () => pickAndRun(macroSession(), output));
   register('tn5250.stopMacro', () => stopMacro());
-  register('tn5250.macros', () => manageMacros(TerminalPanel.active?.profile ? TerminalPanel.active.macroSession() : undefined, output, startRecording));
+  register('tn5250.macros', () => manageMacros(macroSession(), output, startRecording));
+  register('tn5250.newMacro', () => newEmptyMacro());
+  register('tn5250.importMacros', () => importMacros());
+  register('tn5250.exportMacros', () => exportMacros());
+  // The Macros view: play, pencil and trash on each row.
+  register('tn5250.runMacroItem', (item: MacroItem) => {
+    if (!item?.macro) return;
+    macrosProvider.deselect(item);
+    const session = macroSession();
+    if (session) void playMacro(item.macro, session, output);
+    else void vscode.window.showInformationMessage('TN5250: open a terminal tab first.');
+  });
+  register('tn5250.editMacroItem', (item: MacroItem) => {
+    if (!item?.macro) return;
+    macrosProvider.deselect(item);
+    void macroActions(item.macro, macroSession(), output);
+  });
+  register('tn5250.deleteMacroItem', (item: MacroItem) => {
+    if (!item?.macro) return;
+    macrosProvider.deselect(item);
+    void deleteMacro(item.macro);
+  });
   context.subscriptions.push(macroStore.onDidChange(() => [...TerminalPanel.open].forEach((p) => p.refreshConfig())));
   register('tn5250.printScreen', async () => {
     const text = TerminalPanel.active?.screenText();
