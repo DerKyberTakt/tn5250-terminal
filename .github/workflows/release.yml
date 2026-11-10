@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  # Open VSX trusted publishing exchanges a GitHub OIDC token for a short-lived publish token.
+  id-token: write
 
 jobs:
   publish:
@@ -30,3 +32,6 @@ jobs:
         run: npx @vscode/vsce publish --no-dependencies --packagePath tn5250-terminal.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: Publish to Open VSX (trusted publisher, no token; a failure here never blocks the release)
+        continue-on-error: true
+        run: npx ovsx@1 publish tn5250-terminal.vsix --trusted-publishing --skip-duplicate
