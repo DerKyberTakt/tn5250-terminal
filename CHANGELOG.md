@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.2.3 - unreleased
+- Fixed: pasting several lines onto a command line, STRSQL or QSH kept only the last line: a Field Exit was pressed between the lines, and on a screen with one entry field that wipes the line just pasted. Paste now works as in ACS: the first line at the cursor, each following line one row down at the column the paste started in; Field Wrap means a line that reaches the end of its field continues in the next field (off: the rest of the line is dropped); Stop pasting when protected line encountered stops at a protected row (off: skips to the next row that takes input); Move cursor to end of paste as before. Tab characters, type-ahead and macro recording follow the same path.
 - Settings > Connection has an Import Connections… button (ACS session profiles or Code for IBM i), the same import as the Sessions view.
 
 ## 0.2.2 - 2026-11-08
