@@ -768,6 +768,11 @@
           "type": "boolean",
           "description": "TN5250: auto fit. Set it on the TN5250 Settings page."
         },
+        "tn5250.font.fillWindow": {
+          "default": true,
+          "type": "boolean",
+          "description": "TN5250: with auto fit, stretch the screen to fill the window (as ACS). Set it on the TN5250 Settings page."
+        },
         "tn5250.font.family": {
           "default": "",
           "type": "string",
