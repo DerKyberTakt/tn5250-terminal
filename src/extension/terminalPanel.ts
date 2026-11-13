@@ -524,6 +524,10 @@ Trust it only if this fingerprint matches what the system administrator shows fo
         this.recorder?.text(msg.text);
         this.controller?.type(msg.text);
         break;
+      case 'pasteText':
+        this.recorder?.paste(msg.text);
+        this.controller?.paste(msg.text, msg.options);
+        break;
       case 'macro':
         if (!runMacroKey(msg.key, this.macroSession(), this.output)) this.output.appendLine(`no macro on ${msg.key}`);
         break;

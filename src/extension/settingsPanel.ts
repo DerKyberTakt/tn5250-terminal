@@ -199,6 +199,11 @@ export class SettingsPanel {
       case 'setPassword':
         await setPasswordInteractive(this.context, msg.target);
         break;
+      case 'importConnections':
+        // The command does the picking, the preview and the Undo offer; the page then shows the new list.
+        await vscode.commands.executeCommand('tn5250.importConnections');
+        this.push();
+        break;
       case 'importKmp': {
         // The page merges the keys into its unsaved edits; nothing is written until Save.
         const result = await pickKmp();

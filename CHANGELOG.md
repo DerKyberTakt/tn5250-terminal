@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 - 2026-11-12
+- Fixed: a field with both CHECK(FE) and CHECK(ER) (field exit required, end of record: the customer number on an order entry header, for one) sent its automatic Enter the moment the last character was typed; it now waits for Field Exit, Field+ or Field-, as ACS and a real terminal do, so a number typed on the keypad can still be corrected.
+- Fixed: an error message in a DDS window (Write Error Code to Window) started at column 1 of the screen and ran over the window's left border. It is written between the columns the host gives, inside the window, and the rest of the row keeps what was there.
+- Fill the Window (Settings > Screen > Font, on by default with Font Scaling): the screen is stretched to fill the tab, the characters scaled sideways to match, as ACS and PCOMM do, instead of keeping the font's proportions and leaving a band of empty space below or beside a 27x132 screen. Off keeps the old look. Zooming (Ctrl+wheel) keeps the proportions.
+- Fixed: pasting several lines onto a command line, STRSQL or QSH kept only the last line: a Field Exit was pressed between the lines, and on a screen with one entry field that wipes the line just pasted. Paste now works as in ACS: the first line at the cursor, each following line one row down at the column the paste started in; Field Wrap means a line that reaches the end of its field continues in the next field (off: the rest of the line is dropped); Stop pasting when protected line encountered stops at a protected row (off: skips to the next row that takes input); Move cursor to end of paste as before. Tab characters, type-ahead and macro recording follow the same path.
+- Settings > Connection has an Import Connections… button (ACS session profiles or Code for IBM i), the same import as the Sessions view.
+
 ## 0.2.2 - 2026-11-08
 
 - A Macros view in the TN5250 side bar, under Sessions: every macro with its key and step count, play / pencil / trash on each row, New, Record (Stop Recording while one runs), Import and Export on its title bar.

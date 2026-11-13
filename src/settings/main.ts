@@ -160,7 +160,7 @@ type FieldSpec = { showIf?: Key; hideIf?: Key; showWhen?: [Key, string[]]; locke
   | { kind: 'titleParts'; label: string }
   | { kind: 'heading'; label: string }
   | { kind: 'static'; label: string; text: string }
-  | { kind: 'button'; label: string; text: string; message: 'setPassword' | 'setCertPassphrase' | 'exportColors' | 'importColors' | 'resetColors' }
+  | { kind: 'button'; label: string; text: string; message: 'setPassword' | 'setCertPassphrase' | 'exportColors' | 'importColors' | 'resetColors' | 'importConnections' }
   | { kind: 'preview' }
 );
 
@@ -202,6 +202,7 @@ const HELP: Partial<Record<Key, string>> = {
   columnSeparators: 'How the 5250 column separator attribute (turquoise and yellow fields) is drawn: a dot at the base of each cell, a vertical line, or nothing.',
   showStatusLine: 'Show the operator information area under the screen: connection, X SYSTEM / X II, insert mode, message waiting, cursor position.',
   autoFit: 'On: the font scales so the whole screen fits the tab (zoom with Ctrl+wheel, Ctrl+0 resets). Off: the fixed font size below is used.',
+  fillWindow: 'On: the screen is stretched to fill the window, the characters scaled sideways to match, as ACS does. Off: the characters keep their proportions and the space left over stays empty.',
   fontSize: 'Font size in pixels when Font Scaling is off.',
   textRendering: 'Smooth = antialiased text. Crisp = cells snapped to whole pixels for sharper edges at small sizes.',
   fontFamily: 'Pick an installed font (monospaced fonts are listed first; untick the filter to see every font) or Browse to import a .ttf/.otf file, which is copied into the extension storage and loaded only for the terminal. Blank uses the VS Code editor font.',
@@ -248,8 +249,8 @@ const HELP: Partial<Record<Key, string>> = {
   enhancedSelectionText: 'Text colour inside the selection. "auto" picks black or white for contrast; or enter a colour like #ffffff.',
   enhancedSelectionOpacity: 'Opacity of the selection highlight. 0 = invisible, 1 = solid.',
   enhancedPadding: 'Space around the screen in pixels so it floats like a card.',
-  pasteFieldWrap: 'A line break in pasted text presses Field Exit (next field). Off: it presses New Line instead.',
-  pasteStopAtProtected: 'Stop when pasted text runs into a protected area instead of leaving the keyboard in an error state.',
+  pasteFieldWrap: 'A pasted line that reaches the end of its field continues in the next field. Off: the rest of that line is dropped.',
+  pasteStopAtProtected: 'Each pasted line goes one row down at the column the paste started in. Stop when that position is protected. Off: skip to the next row that takes input.',
   pasteMoveCursorToEnd: 'Leave the cursor after the pasted text. Off: return it to where the paste started.',
   pasteTabMode: 'What a tab character in pasted text does: replaced by spaces, padded to the next tab stop, or pressed as Tab to move to the next field.',
   pasteTabSpaces: 'Spaces per tab character when tabs are replaced with spaces.',
@@ -321,6 +322,8 @@ const PAGES: Array<{ id: string; title: string; group: string; fields: FieldSpec
       YESNO('demoMode', 'Demo session'),
       { kind: 'text', key: 'demoLabel', label: 'Label', showIf: 'demoMode' },
       { kind: 'color', key: 'demoColor', label: 'Colour', showIf: 'demoMode' },
+      { kind: 'heading', label: 'Import' },
+      { kind: 'button', label: 'From ACS or Code for IBM i', text: 'Import Connections…', message: 'importConnections' },
     ],
   },
   {
@@ -381,6 +384,7 @@ const PAGES: Array<{ id: string; title: string; group: string; fields: FieldSpec
     group: 'Screen',
     fields: [
       YESNO('autoFit', 'Font Scaling'),
+      { ...YESNO('fillWindow', 'Fill the Window'), showIf: 'autoFit' },
       { kind: 'number', key: 'fontSize', label: 'Fixed Font Size', min: 6, max: 72, hideIf: 'autoFit' },
       { kind: 'select', key: 'textRendering', label: 'Antialiasing', options: [['smooth', 'Yes (smooth)'], ['crisp', 'No (crisp, pixel-aligned)']] },
       { kind: 'font', key: 'fontFamily', label: 'Font Name' },
@@ -744,6 +748,7 @@ function updatePreview(): void {
   r.setOptions({
     uiMode: v.uiMode,
     autoFit: true,
+    fillWindow: v.fillWindow,
     fontFamily: v.fontFamily,
     fontSize: v.fontSize,
     fontStyle: v.fontStyle,
@@ -846,7 +851,7 @@ function renderFieldInner(f: FieldSpec): HTMLElement | undefined {
     mark.title = 'Takes effect on the next connection. Saving while a tab is open offers to reload it.';
     label.append(mark);
   }
-  const helpText = 'key' in f ? HELP[f.key] : f.kind === 'button' && f.message === 'setPassword' ? 'Kept in the secret store (VS Code secret storage, or the Windows Credential Manager / keyring in the desktop app), never in settings or files.' : f.kind === 'titleParts' ? 'Parts of the tab title, in this order. The session ID is a letter A, B, C per open tab, like ACS.' : undefined;
+  const helpText = 'key' in f ? HELP[f.key] : f.kind === 'button' && f.message === 'setPassword' ? 'Kept in the secret store (VS Code secret storage, or the Windows Credential Manager / keyring in the desktop app), never in settings or files.' : f.kind === 'button' && f.message === 'importConnections' ? 'Reads ACS session profiles (.hod) or Code for IBM i connections. Only 5250 display sessions; passwords are never read. A connection already saved is updated in place.' : f.kind === 'titleParts' ? 'Parts of the tab title, in this order. The session ID is a letter A, B, C per open tab, like ACS.' : undefined;
   if (helpText) label.append(infoBubble(helpText));
   row.append(label);
   if (f.kind === 'static') {
