@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.3 - unreleased
+## 0.2.3 - 2026-11-12
 - Fixed: a field with both CHECK(FE) and CHECK(ER) (field exit required, end of record: the customer number on an order entry header, for one) sent its automatic Enter the moment the last character was typed; it now waits for Field Exit, Field+ or Field-, as ACS and a real terminal do, so a number typed on the keypad can still be corrected.
 - Fixed: an error message in a DDS window (Write Error Code to Window) started at column 1 of the screen and ran over the window's left border. It is written between the columns the host gives, inside the window, and the rest of the row keeps what was there.
 - Fill the Window (Settings > Screen > Font, on by default with Font Scaling): the screen is stretched to fill the tab, the characters scaled sideways to match, as ACS and PCOMM do, instead of keeping the font's proportions and leaving a band of empty space below or beside a 27x132 screen. Off keeps the old look. Zooming (Ctrl+wheel) keeps the proportions.
