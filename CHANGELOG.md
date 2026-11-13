@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4 - unreleased
+- macOS: Cmd+C copies, Cmd+V pastes and Cmd+Enter toggles Insert mode by default (Apple keyboards have no Insert key); any other key can still be given to Insert on the Keyboard settings page. Ctrl+C, Ctrl+Insert, Ctrl+V and Shift+Insert work as before. Asked for by Bob Cozzi (#12, #13).
+- Right-click on the screen opens a menu with Copy (the selection, or Copy Screen when nothing is selected), Paste and Select All, as ACS offers; Escape or a click elsewhere closes it. A host that asked for the right mouse button keeps it.
+- Copy from VS Code's own Edit menu (and the keys VS Code routes that way) copies the selection or the screen, as the Copy key does.
+
 ## 0.2.3 - 2026-11-12
 - Fixed: a field with both CHECK(FE) and CHECK(ER) (field exit required, end of record: the customer number on an order entry header, for one) sent its automatic Enter the moment the last character was typed; it now waits for Field Exit, Field+ or Field-, as ACS and a real terminal do, so a number typed on the keypad can still be corrected.
 - Fixed: an error message in a DDS window (Write Error Code to Window) started at column 1 of the screen and ran over the window's left border. It is written between the columns the host gives, inside the window, and the rest of the row keeps what was there.
