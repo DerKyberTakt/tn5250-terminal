@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.2.5 - unreleased
+- Engine: a Write To Display whose control character asks to null the modified fields and reset the tags (CC1 X'C0') now nulls them: the tags were reset first, so nothing was ever nulled. Found while porting the engine to the console terminal.
 - A screen bigger than its box (a fixed font size, a small window, zoomed out) is shrunk so the whole screen stays in view, instead of getting scroll bars; Settings > Font > "When the Screen Does Not Fit" brings the scroll bars back. Zoomed in (Ctrl+wheel, Ctrl and +) it scrolls as before.
 - The zoom level shows for a moment, bottom right, after Ctrl+wheel or Ctrl and +, -, 0.
 - Colors: every field colour has a background colour beside it (blank = the screen background), as ACS offers; Export, Import and Reset All are small buttons at the top of the page; Reset All leaves the blink colour of the Display page alone.
