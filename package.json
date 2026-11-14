@@ -773,6 +773,12 @@
           "type": "boolean",
           "description": "TN5250: with auto fit, stretch the screen to fill the window (as ACS). Set it on the TN5250 Settings page."
         },
+        "tn5250.font.screenOverflow": {
+          "default": "shrink",
+          "type": "string",
+          "enum": ["shrink", "scroll"],
+          "description": "TN5250: a screen bigger than its box (fixed font size, small window) is shrunk to fit, or gets scroll bars. Set it on the TN5250 Settings page."
+        },
         "tn5250.font.family": {
           "default": "",
           "type": "string",

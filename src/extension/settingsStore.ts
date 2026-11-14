@@ -47,6 +47,7 @@ const DEFAULT_KEYS: Record<keyof TerminalSettings, string | undefined> = {
   showStatusLine: 'display.showStatusLine',
   autoFit: 'font.autoFit',
   fillWindow: 'font.fillWindow',
+  screenOverflow: 'font.screenOverflow',
   fontFamily: 'font.family',
   fontFile: 'font.file',
   fontSize: 'font.size',

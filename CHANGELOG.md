@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.5 - unreleased
+- A screen bigger than its box (a fixed font size, a small window, zoomed out) is shrunk so the whole screen stays in view, instead of getting scroll bars; Settings > Font > "When the Screen Does Not Fit" brings the scroll bars back. Zoomed in (Ctrl+wheel, Ctrl and +) it scrolls as before.
+- The zoom level shows for a moment, bottom right, after Ctrl+wheel or Ctrl and +, -, 0.
+
 ## 0.2.4 - 2026-11-13
 - macOS: Cmd+C copies, Cmd+V pastes and Cmd+Enter toggles Insert mode by default (Apple keyboards have no Insert key); any other key can still be given to Insert on the Keyboard settings page. Ctrl+C, Ctrl+Insert, Ctrl+V and Shift+Insert work as before. Asked for by Bob Cozzi (#12, #13).
 - Right-click on the screen opens a menu with Copy (the selection, or Copy Screen when nothing is selected), Paste and Select All, as ACS offers; Escape or a click elsewhere closes it. A host that asked for the right mouse button keeps it.
