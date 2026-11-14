@@ -3,6 +3,10 @@
 ## 0.2.5 - unreleased
 - A screen bigger than its box (a fixed font size, a small window, zoomed out) is shrunk so the whole screen stays in view, instead of getting scroll bars; Settings > Font > "When the Screen Does Not Fit" brings the scroll bars back. Zoomed in (Ctrl+wheel, Ctrl and +) it scrolls as before.
 - The zoom level shows for a moment, bottom right, after Ctrl+wheel or Ctrl and +, -, 0.
+- Colors: every field colour has a background colour beside it (blank = the screen background), as ACS offers; Export, Import and Reset All are small buttons at the top of the page; Reset All leaves the blink colour of the Display page alone.
+- Tab Setup: a tab colour and a tab mark (an emoji or up to three letters) per connection; the desktop app shows them on the session's tab.
+- Watermark: a Custom position is set by its two sliders alone (the offsets no longer pull it elsewhere; dragging the preview moves the sliders); the offsets move a centred, corner or tiled watermark, as before.
+- The settings page's footer link says what it opens: VS Code's settings, or the desktop app's settings file.
 
 ## 0.2.4 - 2026-11-13
 - macOS: Cmd+C copies, Cmd+V pastes and Cmd+Enter toggles Insert mode by default (Apple keyboards have no Insert key); any other key can still be given to Insert on the Keyboard settings page. Ctrl+C, Ctrl+Insert, Ctrl+V and Shift+Insert work as before. Asked for by Bob Cozzi (#12, #13).

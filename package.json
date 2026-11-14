@@ -899,6 +899,41 @@
           "type": "string",
           "description": "TN5250: color blue. Set it on the TN5250 Settings page."
         },
+        "tn5250.colors.greenBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind green text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.whiteBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind white text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.redBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind red text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.turquoiseBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind turquoise text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.yellowBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind yellow text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.pinkBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind pink text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.blueBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind blue text (blank = screen background). Set it on the TN5250 Settings page."
+        },
         "tn5250.colors.background": {
           "default": "#000000",
           "type": "string",
@@ -1130,6 +1165,16 @@
           "default": false,
           "type": "boolean",
           "description": "TN5250: warn on close multiple. Set it on the TN5250 Settings page."
+        },
+        "tn5250.tabs.color": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: a colour stripe on the tab (desktop app). Set it on the TN5250 Settings page."
+        },
+        "tn5250.tabs.icon": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: a short mark (emoji or letters) before the tab title. Set it on the TN5250 Settings page."
         },
         "tn5250.behavior.mouseWheelPaging": {
           "default": true,
