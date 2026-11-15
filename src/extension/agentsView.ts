@@ -215,7 +215,7 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
         modal: true,
         detail:
           `The agent signs on as ${user} with your password, with bypass sign-on turned on, and everything it does on the host is logged under your profile.\n\n` +
-          `Your password is written in clear text to the console terminal's sites file:\n${path}\n(site "${siteName}"; the file is readable by every program running as you).\n\n` +
+          `Your password is written to the console terminal's sites file:\n${path}\n(site "${siteName}"). The next start of tn5250-tui or its MCP server moves it from there into the OS secret store (Credential Manager, Keychain, Secret Service); until then the file holds it in clear text, readable by every program running as you.\n\n` +
           `Remove it any time with TN5250: Remove Agent Enrollment, or :sites in tn5250-tui.`,
       },
       'Enroll',
