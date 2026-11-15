@@ -70,7 +70,7 @@ Known keyboard gaps: characters typed with AltGr are not passed through yet, and
 
 All options are available on the Settings page and as ordinary VS Code settings under `tn5250.*`. "Defaults" apply to every tab; each saved connection stores only what differs from the defaults.
 
-**Host code page** must be the CCSID the host reads your keystrokes with (`DSPSYSVAL QCCSID`, or the CCSID of your user profile; the same value an ACS session for that host uses). The default is 037. The emulator sends EBCDIC bytes and the host interprets them, so a wrong code page turns `!` into `Ü` or `]` without anything visible on a sign-on screen. See Troubleshooting.
+**Host code page** must be the CCSID the host reads your keystrokes with (`DSPSYSVAL QCCSID`, or the CCSID of your user profile; the same value an ACS session for that host uses). The default is 037. The emulator sends EBCDIC bytes and the host interprets them, so a wrong code page turns `!` into `Ü` or `]` without anything visible on a sign-on screen. See Troubleshooting. The single-byte EBCDIC pages offered: 037, 273, 277, 278, 280, 284, 285, 297, 500, 871 (Latin-1 by country), 870 and 1153 (Latin-2: Czech, Slovak, Polish, Hungarian, Croatian, Romanian ...), 875 (Greek), 1025 (Cyrillic), 1026 (Turkish) and the euro variants 1140-1149.
 
 ## Agent sessions (AI agents on the console terminal)
 
