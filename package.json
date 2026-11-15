@@ -2,7 +2,7 @@
   "name": "tn5250-terminal",
   "displayName": "TN5250 Terminal for IBM i",
   "description": "5250 terminal emulator for IBM i (AS/400) that opens as a VS Code editor tab. Pure TypeScript TN5250 client, nothing else to install.",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "publisher": "DerKyberTakt",
   "license": "MIT",
   "private": true,
@@ -871,7 +871,10 @@
         "tn5250.font.screenOverflow": {
           "default": "shrink",
           "type": "string",
-          "enum": ["shrink", "scroll"],
+          "enum": [
+            "shrink",
+            "scroll"
+          ],
           "description": "TN5250: a screen bigger than its box (fixed font size, small window) is shrunk to fit, or gets scroll bars. Set it on the TN5250 Settings page."
         },
         "tn5250.font.family": {
