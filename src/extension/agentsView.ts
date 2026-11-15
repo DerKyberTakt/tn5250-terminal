@@ -1,5 +1,8 @@
+import { dirname } from 'node:path';
 import * as vscode from 'vscode';
-import { attachArgs, fetchSessions, findBinary, listTokens, mergeMcpJson, type AgentSession, type AgentToken } from './agentClient';
+import { attachArgs, enrollSite, fetchSessions, findBinary, listTokens, mergeMcpJson, removeSite, sitesPath, type AgentSession, type AgentToken } from './agentClient';
+import { findPassword } from './secretKeys';
+import { resolvedSessions } from './settingsStore';
 
 /** A running `tn5250-tui mcp` server (one Claude Code session, usually). */
 export class AgentServerItem extends vscode.TreeItem {
@@ -166,6 +169,114 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     if (!term) return;
     // The move commands act on the active terminal; show() made it so.
     await vscode.commands.executeCommand(where === 'editor' ? 'workbench.action.terminal.moveToEditor' : 'workbench.action.terminal.moveIntoNewWindow');
+  }
+
+  /**
+   * Enroll User for AI Agent: saves one of this extension's connections, with the user's
+   * own sign-on, as the agent's site in the console terminal's sites file, bypass sign-on
+   * on. For people who cannot get a separate user profile for their agent (contractors,
+   * say). The password leaves the secret store for a clear-text file, so it asks first
+   * and says where it goes.
+   */
+  async enroll(): Promise<void> {
+    const sessions = resolvedSessions().filter((s) => s.host.trim());
+    if (!sessions.length) {
+      void vscode.window.showInformationMessage('TN5250: add a connection first (Sessions view, +); the agent enrolls with one of your connections.');
+      return;
+    }
+    const pick = await vscode.window.showQuickPick(
+      sessions.map((s, i) => ({ label: s.name || s.host, description: `${s.signonUser.trim().toUpperCase() || 'no user'}@${s.host}:${s.port}${s.tls ? ' TLS' : ''}`, i })),
+      { title: 'TN5250: enroll which connection for the AI agent?', placeHolder: 'The agent signs on with this connection and your user profile' },
+    );
+    if (!pick) return;
+    const session = sessions[pick.i]!;
+    let user = session.signonUser.trim().toUpperCase();
+    if (!user) {
+      const typed = await vscode.window.showInputBox({ title: `TN5250: user profile the agent signs on with at ${session.host}`, prompt: 'The connection has no sign-on user.', ignoreFocusOut: true });
+      if (!typed?.trim()) return;
+      user = typed.trim().toUpperCase();
+    }
+    let password = await findPassword(this.context.secrets, session, user);
+    if (!password) {
+      password = await vscode.window.showInputBox({
+        title: `TN5250: password of ${user} at ${session.host}`,
+        prompt: 'Not in the VS Code secret store. It goes into the console terminal’s sites file only (not stored here).',
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (!password) return;
+    }
+    const cfg = vscode.workspace.getConfiguration('tn5250');
+    const siteName = cfg.get<string>('agent.site', 'agent').trim() || 'agent';
+    const path = sitesPath();
+    const ok = await vscode.window.showWarningMessage(
+      `Enroll ${user}@${session.host} for the AI agent?`,
+      {
+        modal: true,
+        detail:
+          `The agent signs on as ${user} with your password, with bypass sign-on turned on, and everything it does on the host is logged under your profile.\n\n` +
+          `Your password is written in clear text to the console terminal's sites file:\n${path}\n(site "${siteName}"; the file is readable by every program running as you).\n\n` +
+          `Remove it any time with TN5250: Remove Agent Enrollment, or :sites in tn5250-tui.`,
+      },
+      'Enroll',
+    );
+    if (ok !== 'Enroll') return;
+    const target = vscode.Uri.file(path);
+    let existing: string | undefined;
+    try {
+      existing = Buffer.from(await vscode.workspace.fs.readFile(target)).toString('utf8');
+    } catch {
+      existing = undefined;
+    }
+    let text: string;
+    try {
+      text = enrollSite(existing, {
+        name: siteName,
+        host: session.host,
+        port: session.port,
+        tls: session.tls,
+        trustAnyCertificate: !session.verifyCertificate,
+        user,
+        password,
+        screenSize: session.screenSize,
+        codePage: session.codePage,
+        deviceName: '', // the host names the agent's workstation; the user's own name stays free
+        autoSignon: true,
+      });
+    } catch (e) {
+      void vscode.window.showErrorMessage(`TN5250: ${path} is not valid JSON (${(e as Error).message}); fix it or remove it first.`);
+      return;
+    }
+    await vscode.workspace.fs.createDirectory(vscode.Uri.file(dirname(path)));
+    await vscode.workspace.fs.writeFile(target, Buffer.from(text, 'utf8'));
+    const next = await vscode.window.showInformationMessage(`TN5250: ${user}@${session.host} enrolled as site "${siteName}" in ${path}.`, 'Set Up Claude Code');
+    if (next) await this.setup();
+  }
+
+  /** Removes the agent's site (and the password in it) from the console terminal's sites file. */
+  async unenroll(): Promise<void> {
+    const siteName = vscode.workspace.getConfiguration('tn5250').get<string>('agent.site', 'agent').trim() || 'agent';
+    const path = sitesPath();
+    const target = vscode.Uri.file(path);
+    let existing: string | undefined;
+    try {
+      existing = Buffer.from(await vscode.workspace.fs.readFile(target)).toString('utf8');
+    } catch {
+      existing = undefined;
+    }
+    let text: string | undefined;
+    try {
+      text = removeSite(existing, siteName);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`TN5250: ${path} is not valid JSON (${(e as Error).message}).`);
+      return;
+    }
+    if (text === undefined) {
+      void vscode.window.showInformationMessage(`TN5250: no site "${siteName}" in ${path}; nothing to remove.`);
+      return;
+    }
+    await vscode.workspace.fs.writeFile(target, Buffer.from(text, 'utf8'));
+    void vscode.window.showInformationMessage(`TN5250: site "${siteName}" removed from ${path}. A running agent server keeps its open sessions until it exits.`);
   }
 
   /** Writes (or merges) the Claude Code `.mcp.json` of the workspace. */

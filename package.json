@@ -299,6 +299,17 @@
         "icon": "$(gear)"
       },
       {
+        "command": "tn5250.agent.enroll",
+        "title": "Enroll User for AI Agent...",
+        "category": "TN5250",
+        "icon": "$(person-add)"
+      },
+      {
+        "command": "tn5250.agent.unenroll",
+        "title": "Remove Agent Enrollment",
+        "category": "TN5250"
+      },
+      {
         "command": "tn5250.agent.watch",
         "title": "Watch in Terminal",
         "category": "TN5250",
@@ -505,6 +516,11 @@
           "command": "tn5250.agent.setup",
           "when": "view == tn5250.agents",
           "group": "navigation@2"
+        },
+        {
+          "command": "tn5250.agent.enroll",
+          "when": "view == tn5250.agents",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -2069,7 +2085,7 @@
       },
       {
         "view": "tn5250.agents",
-        "contents": "No agent server is running.\nAn AI agent (Claude Code) drives 5250 sessions through tn5250-tui mcp, the console terminal's MCP server; its sessions appear here and each one can be watched in a terminal.\n[Set Up Claude Code](command:tn5250.agent.setup)\nWrites .mcp.json in the workspace."
+        "contents": "No agent server is running.\nAn AI agent (Claude Code) drives 5250 sessions through tn5250-tui mcp, the console terminal's MCP server; its sessions appear here and each one can be watched in a terminal.\n[Set Up Claude Code](command:tn5250.agent.setup)\nWrites .mcp.json in the workspace.\n[Enroll User for AI Agent](command:tn5250.agent.enroll)\nLets the agent sign on with one of your connections and your user profile (bypass sign-on), when it cannot have a profile of its own."
       },
       {
         "view": "tn5250.macrosView",

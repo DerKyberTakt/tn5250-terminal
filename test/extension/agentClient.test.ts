@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { attachArgs, fetchSessions, findBinary, listTokens, mergeMcpJson, tokenDir } from '../../src/extension/agentClient';
+import { attachArgs, enrollSite, fetchSessions, findBinary, listTokens, mergeMcpJson, removeSite, sitesPath, tokenDir } from '../../src/extension/agentClient';
 
 /** A fake `tn5250-tui mcp` viewer listener: hello with the token, then list. */
 function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
@@ -99,5 +99,30 @@ describe('agent client', () => {
     expect(merged.note).toBe(1);
     expect(merged.mcpServers.tn5250).toEqual({ command: 'C:\\t\\tn5250-tui.exe', args: ['mcp'] });
     expect(() => mergeMcpJson('{oops', { binary: 'x', site: '', readOnly: true })).toThrow();
+  });
+
+  it('sites file sits beside the token directory, or is the env override', () => {
+    expect(sitesPath({ TN5250_TUI_CONFIG: '/x/sites.json' }, 'linux')).toBe('/x/sites.json');
+    expect(sitesPath({ APPDATA: 'C:\\Users\\a\\AppData\\Roaming' }, 'win32')).toBe(join('C:\\Users\\a\\AppData\\Roaming', 'tn5250-tui', 'sites.json'));
+    expect(sitesPath({ XDG_CONFIG_HOME: '/home/a/.config' }, 'linux')).toBe(join('/home/a/.config', 'tn5250-tui', 'sites.json'));
+  });
+
+  it('enrolls a site into the sites file and removes it again', () => {
+    const site = { name: 'agent', host: 'PUB400.COM', port: 23, tls: false, trustAnyCertificate: false, user: 'ME', password: 'pw', screenSize: '27x132', codePage: 37, deviceName: '', autoSignon: true };
+    type Sites = { sites: Array<Record<string, unknown>>; lastUsed: string };
+    const fresh = JSON.parse(enrollSite(undefined, site)) as Sites;
+    expect(fresh).toEqual({ sites: [site], lastUsed: '' });
+    // Replaced by name (case-insensitively, as the console terminal matches), unknown fields kept, others untouched.
+    const existing = JSON.stringify({ sites: [{ name: 'Agent', host: 'old', port: 992, demo: true, password: 'x' }, { name: 'other', host: 'h' }], lastUsed: 'Agent', defaults: { codePage: 37 } });
+    const merged = JSON.parse(enrollSite(existing, site)) as Sites & { defaults: unknown };
+    expect(merged.sites).toEqual([{ ...site, demo: true }, { name: 'other', host: 'h' }]);
+    expect(merged.defaults).toEqual({ codePage: 37 });
+    expect(merged.lastUsed).toBe('Agent');
+    expect(() => enrollSite('{nope', site)).toThrow();
+    const removed = JSON.parse(removeSite(JSON.stringify(merged), 'AGENT') as string) as Sites;
+    expect(removed.sites).toEqual([{ name: 'other', host: 'h' }]);
+    expect(removed.lastUsed).toBe('');
+    expect(removeSite(JSON.stringify(removed), 'agent')).toBeUndefined();
+    expect(removeSite(undefined, 'agent')).toBeUndefined();
   });
 });

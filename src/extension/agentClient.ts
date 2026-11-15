@@ -9,7 +9,7 @@
  */
 import { readdirSync, readFileSync, statSync, unlinkSync, accessSync, constants } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { Socket, createConnection } from 'node:net';
 
 export interface AgentToken {
@@ -49,6 +49,66 @@ export function tokenDir(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.
   }
   const base = env.XDG_CONFIG_HOME || join(homedir(), '.config');
   return join(base, 'tn5250-tui', 'agent');
+}
+
+/** The console terminal's sites file (sites.json), beside the token directory. */
+export function sitesPath(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string {
+  if (env.TN5250_TUI_CONFIG) return env.TN5250_TUI_CONFIG;
+  return join(dirname(tokenDir(env, platform)), 'sites.json');
+}
+
+/** A site as the console terminal stores it; the password is clear text by its design. */
+export interface EnrollSite {
+  name: string;
+  host: string;
+  port: number;
+  tls: boolean;
+  trustAnyCertificate: boolean;
+  user: string;
+  password: string;
+  screenSize: string;
+  codePage: number;
+  deviceName: string;
+  autoSignon: boolean;
+}
+
+interface SitesFile {
+  sites?: Array<Record<string, unknown> & { name?: string }>;
+  lastUsed?: string;
+  [k: string]: unknown;
+}
+
+function parseSites(existing: string | undefined): SitesFile {
+  if (!existing || !existing.trim()) return { sites: [], lastUsed: '' };
+  const root = JSON.parse(existing) as SitesFile;
+  if (!Array.isArray(root.sites)) root.sites = [];
+  return root;
+}
+
+const sameName = (a: string | undefined, b: string): boolean => (a ?? '').toLowerCase() === b.toLowerCase();
+
+/**
+ * Writes (or replaces, by name as the console terminal matches it: case-insensitively)
+ * one site in the sites file's text. Fields of an existing entry this call does not know
+ * (demo, say) are kept.
+ */
+export function enrollSite(existing: string | undefined, site: EnrollSite): string {
+  const root = parseSites(existing);
+  const sites = root.sites!;
+  const i = sites.findIndex((s) => sameName(s.name, site.name));
+  if (i >= 0) sites[i] = { ...sites[i], ...site };
+  else sites.push({ ...site });
+  return JSON.stringify(root, null, 2) + '\n';
+}
+
+/** Removes the site called name; undefined when there is none. */
+export function removeSite(existing: string | undefined, name: string): string | undefined {
+  const root = parseSites(existing);
+  const before = root.sites!.length;
+  root.sites = root.sites!.filter((s) => !sameName(s.name, name));
+  if (root.sites.length === before) return undefined;
+  if (sameName(root.lastUsed, name)) root.lastUsed = '';
+  return JSON.stringify(root, null, 2) + '\n';
 }
 
 /** Reads the token files, newest first; unreadable ones are deleted. */
