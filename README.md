@@ -72,6 +72,10 @@ All options are available on the Settings page and as ordinary VS Code settings 
 
 **Host code page** must be the CCSID the host reads your keystrokes with (`DSPSYSVAL QCCSID`, or the CCSID of your user profile; the same value an ACS session for that host uses). The default is 037. The emulator sends EBCDIC bytes and the host interprets them, so a wrong code page turns `!` into `Ü` or `]` without anything visible on a sign-on screen. See Troubleshooting.
 
+## Agent sessions (AI agents on the console terminal)
+
+[tn5250-tui](https://github.com/DerKyberTakt/tn5250-tui), the console version of this terminal, has an MCP server (`tn5250-tui mcp`) through which an AI agent such as Claude Code drives 5250 sessions. With `tn5250.agent.enabled` on, the **Agent Sessions** view lists the running servers (found through their token files) and the sessions each one holds; a click opens the session read-only in a VS Code terminal (`tn5250-tui attach`), and the row's buttons put that terminal in the editor area or in its own window so you can watch the agent work while you do something else. **TN5250: Set Up Claude Code** writes the workspace's `.mcp.json` for the site named in `tn5250.agent.site` (give the agent its own user profile and save it as a site in tn5250-tui); `tn5250.agent.readOnly` starts the server with `--read-only`. Nothing in this extension's own sessions or secret store is shared with the agent.
+
 ## Security and privacy
 
 - Passwords and certificate passphrases are stored in the VS Code secret store, never in settings files, logs or traces (a saved trace blanks what was typed into non-display fields). The secret store is protected by the operating system keyring where there is one (Windows Credential Manager, macOS Keychain, a Secret Service keyring on Linux); on a Linux machine without a keyring, leave bypass sign-on off. Passwords are keyed by user profile and host, so a session never picks up another user's password.

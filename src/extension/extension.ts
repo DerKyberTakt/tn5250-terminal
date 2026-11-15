@@ -11,6 +11,7 @@ import { watchRecording, MacroRecorder } from '../shared/macros';
 import { deleteMacro, exportMacros, importMacros, macroActions, macroStore, manageMacros, newEmptyMacro, pickAndRun, playMacro, saveRecordedMacro, stopMacro } from './macros';
 import { MacroItem, MacrosProvider } from './macrosView';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
+import { AgentSessionItem, AgentsProvider } from './agentsView';
 
 const LAST_SESSION_KEY = 'tn5250.lastSession';
 
@@ -200,6 +201,18 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
   register('tn5250.setPassword', () => setPasswordInteractive(context, -1));
+
+  // Agent Sessions: the console terminal's MCP server (tn5250-tui mcp) and the 5250 sessions
+  // it holds for an AI agent; each one opens read-only in a terminal (tn5250-tui attach).
+  const agents = new AgentsProvider(context);
+  const agentsView = vscode.window.createTreeView('tn5250.agents', { treeDataProvider: agents });
+  agents.attach(agentsView);
+  context.subscriptions.push(agentsView);
+  register('tn5250.agent.refresh', () => agents.refresh());
+  register('tn5250.agent.setup', () => agents.setup());
+  register('tn5250.agent.watch', (item: AgentSessionItem) => agents.watch(item));
+  register('tn5250.agent.popOut', (item: AgentSessionItem) => agents.popOut(item, 'editor'));
+  register('tn5250.agent.newWindow', (item: AgentSessionItem) => agents.popOut(item, 'window'));
 
   // Macros: recorded in the active tab, run by key, from the Macros view or from the lists.
   macroStore.init(context);

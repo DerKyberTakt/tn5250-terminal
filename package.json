@@ -285,12 +285,54 @@
         "command": "tn5250.setCertPassphrase",
         "title": "Set TLS Certificate Passphrase (defaults)",
         "category": "TN5250"
+      },
+      {
+        "command": "tn5250.agent.refresh",
+        "title": "Refresh Agent Sessions",
+        "category": "TN5250",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "tn5250.agent.setup",
+        "title": "Set Up Claude Code (.mcp.json)",
+        "category": "TN5250",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "tn5250.agent.watch",
+        "title": "Watch in Terminal",
+        "category": "TN5250",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "tn5250.agent.popOut",
+        "title": "Watch in Editor Area",
+        "category": "TN5250",
+        "icon": "$(screen-full)"
+      },
+      {
+        "command": "tn5250.agent.newWindow",
+        "title": "Watch in New Window",
+        "category": "TN5250",
+        "icon": "$(multiple-windows)"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "tn5250.shadowKey",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.agent.watch",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.agent.popOut",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.agent.newWindow",
           "when": "false"
         },
         {
@@ -453,9 +495,34 @@
           "command": "tn5250.macros",
           "when": "view == tn5250.macrosView",
           "group": "1_more@2"
+        },
+        {
+          "command": "tn5250.agent.refresh",
+          "when": "view == tn5250.agents",
+          "group": "navigation@1"
+        },
+        {
+          "command": "tn5250.agent.setup",
+          "when": "view == tn5250.agents",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
+        {
+          "command": "tn5250.agent.watch",
+          "when": "view == tn5250.agents && viewItem == agent-session",
+          "group": "inline@1"
+        },
+        {
+          "command": "tn5250.agent.popOut",
+          "when": "view == tn5250.agents && viewItem == agent-session",
+          "group": "inline@2"
+        },
+        {
+          "command": "tn5250.agent.newWindow",
+          "when": "view == tn5250.agents && viewItem == agent-session",
+          "group": "inline@3"
+        },
         {
           "command": "tn5250.connectSession",
           "when": "view == tn5250.sessions && viewItem =~ /^session/",
@@ -1316,6 +1383,30 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Enhanced UI: opacity of the selection highlight."
+        },
+        "tn5250.agent.enabled": {
+          "scope": "application",
+          "type": "boolean",
+          "default": false,
+          "description": "Show the Agent Sessions view: the 5250 sessions an AI agent holds through tn5250-tui mcp (the console terminal's MCP server), each one watchable in a terminal."
+        },
+        "tn5250.agent.binary": {
+          "scope": "application",
+          "type": "string",
+          "default": "",
+          "description": "Path of tn5250-tui (the console terminal). Empty: found on PATH or in the installer's folder."
+        },
+        "tn5250.agent.site": {
+          "scope": "application",
+          "type": "string",
+          "default": "agent",
+          "description": "The tn5250-tui site the agent signs on with (its own user profile, added in tn5250-tui with :sites). Written into .mcp.json by TN5250: Set Up Claude Code."
+        },
+        "tn5250.agent.readOnly": {
+          "scope": "application",
+          "type": "boolean",
+          "default": true,
+          "description": "Start the agent's server with --read-only: typed text that starts a command that changes things (DLT, CHG, CRT, SBMJOB, CALL, ...) is refused."
         }
       }
     },
@@ -1949,6 +2040,14 @@
           "contextualTitle": "TN5250 Sessions"
         },
         {
+          "id": "tn5250.agents",
+          "name": "Agent Sessions",
+          "icon": "media/sidebar.svg",
+          "contextualTitle": "TN5250 Agent Sessions",
+          "visibility": "collapsed",
+          "when": "tn5250.agent.enabled"
+        },
+        {
           "id": "tn5250.macrosView",
           "name": "Macros",
           "icon": "media/sidebar.svg",
@@ -1967,6 +2066,10 @@
       {
         "view": "tn5250.sessions",
         "contents": "No connections yet.\n[New Connection](command:tn5250.newConnection)\n[Import Connections](command:tn5250.importConnections)\nFrom ACS session profiles or Code for IBM i.\n[Settings](command:tn5250.openSettings)"
+      },
+      {
+        "view": "tn5250.agents",
+        "contents": "No agent server is running.\nAn AI agent (Claude Code) drives 5250 sessions through tn5250-tui mcp, the console terminal's MCP server; its sessions appear here and each one can be watched in a terminal.\n[Set Up Claude Code](command:tn5250.agent.setup)\nWrites .mcp.json in the workspace."
       },
       {
         "view": "tn5250.macrosView",

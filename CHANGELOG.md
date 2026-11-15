@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.2.5 - unreleased
+- Agent Sessions view (off by default: `tn5250.agent.enabled`): the 5250 sessions an AI agent holds through `tn5250-tui mcp`, the console terminal's MCP server, found through its token files; each session opens read-only in a VS Code terminal (`tn5250-tui attach`), in the editor area or in a new window. TN5250: Set Up Claude Code writes the workspace's `.mcp.json` for the agent's site (`tn5250.agent.site`, `tn5250.agent.readOnly`).
 - Engine: a Write To Display whose control character asks to null the modified fields and reset the tags (CC1 X'C0') now nulls them: the tags were reset first, so nothing was ever nulled. Found while porting the engine to the console terminal.
 - A screen bigger than its box (a fixed font size, a small window, zoomed out) is shrunk so the whole screen stays in view, instead of getting scroll bars; Settings > Font > "When the Screen Does Not Fit" brings the scroll bars back. Zoomed in (Ctrl+wheel, Ctrl and +) it scrolls as before.
 - The zoom level shows for a moment, bottom right, after Ctrl+wheel or Ctrl and +, -, 0.
