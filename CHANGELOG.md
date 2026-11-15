@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.2.5 - unreleased
+- Fill the Window is off by default: the characters keep their proportions unless it is switched on.
+- Settings: the screen preview always fits and fills its box, whatever Font Scaling, Fill the Window and Fixed Font Size say; it shows colours, fonts and the watermark, not the size rules.
 - Host code pages 870 and 1153 (EBCDIC Latin-2: Czech, Slovak, Polish, Hungarian, Croatian, Romanian; 1153 with the euro sign), asked for in #16, and the other single-byte pages the NEW-ENVIRON table already named: 277, 278, 280, 284, 285, 297, 871 (Latin-1 by country), 875 (Greek), 1025 (Cyrillic), 1026 (Turkish). The tables come from the IBM code pages Windows ships; 1153 is 870 with the euro sign at X'9F'. Czech letters display and type on an 870 host; the keyboard type sent is CSB (the Keyboard type setting overrides it).
 - Settings: the screen preview on the Colors, Font and Watermark pages had been squeezed into a 560 x 202 box, a fifth of a screen's height, so the fitted text was a few pixels tall. The box now has the shape of an 80 x 24 screen and follows the page width (up to 760 px); the watermark drag and its paddings scale with it.
 - Import from ACS (Juan Concepcion, #17): the inactivity timeout, Bypass signon (switched on, never off; the password still comes from Set Password), the user ID from the Password Prompting field, the key click from the clicker, the paste tab-character choice, and the screen background, status line, active field, rule line and column separator colors.
