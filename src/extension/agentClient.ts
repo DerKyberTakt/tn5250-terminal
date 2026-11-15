@@ -111,6 +111,30 @@ export function removeSite(existing: string | undefined, name: string): string |
   return JSON.stringify(root, null, 2) + '\n';
 }
 
+/** user@host of the site called name in the sites file's text; '' when there is none (or the text is not JSON). */
+export function enrolledUser(existing: string | undefined, name: string): string {
+  try {
+    const site = parseSites(existing).sites!.find((s) => sameName(s.name, name));
+    if (!site) return '';
+    const user = typeof site.user === 'string' ? site.user : '';
+    const host = typeof site.host === 'string' ? site.host : '';
+    return user || host ? `${user}@${host}` : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Whether a .mcp.json text already starts the tn5250 server. */
+export function mcpHasServer(existing: string | undefined): boolean {
+  if (!existing || !existing.trim()) return false;
+  try {
+    const root = JSON.parse(existing) as { mcpServers?: unknown };
+    return !!root.mcpServers && typeof root.mcpServers === 'object' && 'tn5250' in (root.mcpServers as Record<string, unknown>);
+  } catch {
+    return false;
+  }
+}
+
 /** Reads the token files, newest first; unreadable ones are deleted. */
 export function listTokens(dir: string = tokenDir()): AgentToken[] {
   let names: string[];

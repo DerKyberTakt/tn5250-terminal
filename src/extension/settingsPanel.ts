@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import type { HostToSettings, SettingsAssets, SettingsToHost } from '../shared/settingsProtocol';
+import type { AgentSettings, AgentStatus, HostToSettings, SettingsAssets, SettingsToHost } from '../shared/settingsProtocol';
+import { enrolledUser, findBinary, mcpHasServer, sitesPath } from './agentClient';
 import { COLOR_KEYS, copySessionAt, describeChange, reloadPlan, resolveSettings, type TerminalSettings } from '../shared/settings';
 import { pickKmp } from './kmpCommand';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
@@ -99,7 +100,50 @@ export class SettingsPanel {
     const merged = { ...current, ...(patch ?? {}) };
     const extra = [defaults.fontFile, ...sessions.map((s) => s.fontFile ?? '')].filter(Boolean);
     const fonts = (await listSystemFonts(extra)).map((f) => ({ family: f.family, monospace: f.monospace }));
-    return { type: 'data', defaults, sessions, select: this.select, patch, fonts, ...(await this.assets(merged)) };
+    const agent = this.readAgent();
+    return { type: 'data', defaults, sessions, select: this.select, patch, fonts, ...(await this.assets(merged)), agent, agentStatus: await this.agentStatus(agent) };
+  }
+
+  /** The application-scoped AI agent settings (tn5250.agent.*), shown on the AI Agent page. */
+  private readAgent(): AgentSettings {
+    const cfg = vscode.workspace.getConfiguration('tn5250');
+    return {
+      enabled: cfg.get<boolean>('agent.enabled', false),
+      binary: cfg.get<string>('agent.binary', ''),
+      site: cfg.get<string>('agent.site', 'agent'),
+      readOnly: cfg.get<boolean>('agent.readOnly', true),
+    };
+  }
+
+  /** What the AI Agent page reports: the binary found, the enrolled user, the workspace .mcp.json. */
+  private async agentStatus(a: AgentSettings): Promise<AgentStatus> {
+    const read = async (uri: vscode.Uri): Promise<string | undefined> => {
+      try {
+        return Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8');
+      } catch {
+        return undefined;
+      }
+    };
+    let binaryFound = '';
+    const bin = findBinary(a.binary);
+    if (bin) {
+      try {
+        await vscode.workspace.fs.stat(vscode.Uri.file(bin));
+        binaryFound = bin;
+      } catch {
+        binaryFound = '';
+      }
+    }
+    const sitesFile = sitesPath();
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    const mcp = folder ? vscode.Uri.joinPath(folder.uri, '.mcp.json') : undefined;
+    return {
+      binaryFound,
+      sitesFile,
+      enrolled: enrolledUser(await read(vscode.Uri.file(sitesFile)), a.site.trim() || 'agent'),
+      mcpFile: mcp?.fsPath ?? '',
+      mcpConfigured: mcp ? mcpHasServer(await read(mcp)) : false,
+    };
   }
 
   /** Watermark image and imported font of a profile, for the preview. */
@@ -264,6 +308,29 @@ export class SettingsPanel {
       case 'openJson':
         void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:DerKyberTakt.tn5250-terminal');
         break;
+      case 'saveAgent': {
+        const cfg = vscode.workspace.getConfiguration('tn5250');
+        const before = this.readAgent();
+        for (const k of ['enabled', 'binary', 'site', 'readOnly'] as const) {
+          if (msg.values[k] !== before[k]) await cfg.update(`agent.${k}`, msg.values[k], vscode.ConfigurationTarget.Global);
+        }
+        this.push();
+        void vscode.window.setStatusBarMessage('TN5250: agent settings saved', 2500);
+        break;
+      }
+      case 'agentCommand':
+        await vscode.commands.executeCommand(`tn5250.agent.${msg.command}`);
+        this.push();
+        break;
+      case 'browseAgentBinary': {
+        const picked = await vscode.window.showOpenDialog({
+          title: 'tn5250-tui (the console terminal)',
+          canSelectMany: false,
+          filters: process.platform === 'win32' ? { Programs: ['exe'], 'All files': ['*'] } : { 'All files': ['*'] },
+        });
+        if (picked?.[0]) this.send({ type: 'agentBinary', path: picked[0].fsPath });
+        break;
+      }
     }
   }
 }

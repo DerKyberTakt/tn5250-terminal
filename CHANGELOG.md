@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.2.5 - unreleased
+- Settings: an AI Agent page (Agent Sessions view on or off, tn5250-tui location with Browse, site name, read-only server) with Enroll User for AI Agent, Remove Agent Enrollment and Set Up Claude Code, and status lines for the binary found, the user enrolled and the workspace .mcp.json. These are application-wide VS Code settings, saved with their own Save button.
 - Fill the Window is off by default: the characters keep their proportions unless it is switched on.
 - Settings: the screen preview always fits and fills its box, whatever Font Scaling, Fill the Window and Fixed Font Size say; it shows colours, fonts and the watermark, not the size rules.
 - Host code pages 870 and 1153 (EBCDIC Latin-2: Czech, Slovak, Polish, Hungarian, Croatian, Romanian; 1153 with the euro sign), asked for in #16, and the other single-byte pages the NEW-ENVIRON table already named: 277, 278, 280, 284, 285, 297, 871 (Latin-1 by country), 875 (Greek), 1025 (Cyrillic), 1026 (Turkish). The tables come from the IBM code pages Windows ships; 1153 is 870 with the euro sign at X'9F'. Czech letters display and type on an 870 host; the keyboard type sent is CSB (the Keyboard type setting overrides it).

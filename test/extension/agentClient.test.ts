@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { attachArgs, enrollSite, fetchSessions, findBinary, listTokens, mergeMcpJson, removeSite, sitesPath, tokenDir } from '../../src/extension/agentClient';
+import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, mcpHasServer, mergeMcpJson, removeSite, sitesPath, tokenDir } from '../../src/extension/agentClient';
 
 /** A fake `tn5250-tui mcp` viewer listener: hello with the token, then list. */
 function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
@@ -124,5 +124,24 @@ describe('agent client', () => {
     expect(removed.lastUsed).toBe('');
     expect(removeSite(JSON.stringify(removed), 'agent')).toBeUndefined();
     expect(removeSite(undefined, 'agent')).toBeUndefined();
+  });
+});
+
+describe('AI Agent page status helpers', () => {
+  const site = { name: 'Agent', host: 'pub400.com', port: 23, tls: false, trustAnyCertificate: false, user: 'DEMOUSER', password: 'x', screenSize: '24x80', codePage: 37, deviceName: '', autoSignon: true };
+
+  it('enrolledUser names the user and host of the site, matched case-insensitively', () => {
+    const text = enrollSite(undefined, site);
+    expect(enrolledUser(text, 'agent')).toBe('DEMOUSER@pub400.com');
+    expect(enrolledUser(text, 'other')).toBe('');
+    expect(enrolledUser(undefined, 'agent')).toBe('');
+    expect(enrolledUser('{not json', 'agent')).toBe('');
+  });
+
+  it('mcpHasServer sees the tn5250 server only', () => {
+    expect(mcpHasServer(undefined)).toBe(false);
+    expect(mcpHasServer('{"mcpServers":{"other":{}}}')).toBe(false);
+    expect(mcpHasServer(mergeMcpJson(undefined, { binary: 'tn5250-tui', site: 'agent', readOnly: true }))).toBe(true);
+    expect(mcpHasServer('nope')).toBe(false);
   });
 });

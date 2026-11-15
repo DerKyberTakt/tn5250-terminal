@@ -1416,25 +1416,25 @@
           "scope": "application",
           "type": "boolean",
           "default": false,
-          "description": "Show the Agent Sessions view: the 5250 sessions an AI agent holds through tn5250-tui mcp (the console terminal's MCP server), each one watchable in a terminal."
+          "description": "Show the Agent Sessions view: the 5250 sessions an AI agent holds through tn5250-tui mcp (the console terminal's MCP server), each one watchable in a terminal. Set it on the TN5250 Settings page (AI Agent)."
         },
         "tn5250.agent.binary": {
           "scope": "application",
           "type": "string",
           "default": "",
-          "description": "Path of tn5250-tui (the console terminal). Empty: found on PATH or in the installer's folder."
+          "description": "Path of tn5250-tui (the console terminal). Empty: found on PATH or in the installer's folder. Set it on the TN5250 Settings page (AI Agent)."
         },
         "tn5250.agent.site": {
           "scope": "application",
           "type": "string",
           "default": "agent",
-          "description": "The tn5250-tui site the agent signs on with (its own user profile, added in tn5250-tui with :sites). Written into .mcp.json by TN5250: Set Up Claude Code."
+          "description": "The tn5250-tui site the agent signs on with (its own user profile, added in tn5250-tui with :sites). Written into .mcp.json by TN5250: Set Up Claude Code. Set it on the TN5250 Settings page (AI Agent)."
         },
         "tn5250.agent.readOnly": {
           "scope": "application",
           "type": "boolean",
           "default": true,
-          "description": "Start the agent's server with --read-only: typed text that starts a command that changes things (DLT, CHG, CRT, SBMJOB, CALL, ...) is refused."
+          "description": "Start the agent's server with --read-only: typed text that starts a command that changes things (DLT, CHG, CRT, SBMJOB, CALL, ...) is refused. Set it on the TN5250 Settings page (AI Agent)."
         }
       }
     },
