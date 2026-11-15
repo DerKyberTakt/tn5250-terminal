@@ -350,6 +350,7 @@ export function activate(context: vscode.ExtensionContext): void {
   register('tn5250.saveTrace', saveTrace);
   register('tn5250.toggleScreenSize', () => TerminalPanel.active?.toggleScreenSize());
   register('tn5250.toggleKeyDebug', () => TerminalPanel.active?.toggleKeyOverlay());
+  register('tn5250.find', () => TerminalPanel.active?.find());
   // Bound to every key the terminal consumes (see contributes.keybindings) so
   // the default VS Code binding for that key stays quiet while a terminal tab
   // is focused. The webview has already handled the key by the time this runs.

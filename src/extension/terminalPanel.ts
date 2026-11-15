@@ -419,6 +419,11 @@ Trust it only if this fingerprint matches what the system administrator shows fo
     this.pushConfig();
   }
 
+  /** TN5250: Find on Screen: opens the find bar in this tab. */
+  find(): void {
+    this.post({ type: 'find' });
+  }
+
   /** Session events (status on disconnect, async config loads) can arrive after the tab closed. */
   private post(message: HostToWebview): void {
     if (this.disposed) return;
