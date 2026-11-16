@@ -1,7 +1,7 @@
 # Changelog
 
 ## 0.2.5 - unreleased
-- The host code page now reaches the host: KBDTYPE, CODEPAGE and CHARSET were only sent in the NEW-ENVIRON reply together with a workstation ID, so a connection without one left the host's virtual device on its system character set (a trace showed an empty reply). They are sent with or without a device name, as RFC 4777 allows.
+- The host code page now reaches the host: KBDTYPE, CODEPAGE and CHARSET were only sent in the NEW-ENVIRON reply together with a workstation ID, so a connection without one left the host's virtual device on its system character set (a trace showed an empty reply). They are sent with or without a device name, as RFC 4777 allows. A password with `! @ # [ ]` and the like that was set through an older session can stop working after this change, because the host stored the characters it read with its default CCSID: reset it once (README > Troubleshooting).
 - Settings: an AI Agent page (Agent Sessions view on or off, tn5250-tui location with Browse, site name, read-only server) with Enroll User for AI Agent, Remove Agent Enrollment and Set Up Claude Code, and status lines for the binary found, the user enrolled and the workspace .mcp.json. These are application-wide VS Code settings, saved with their own Save button.
 - Fill the Window is off by default: the characters keep their proportions unless it is switched on.
 - Settings: the screen preview always fits and fills its box, whatever Font Scaling, Fill the Window and Fixed Font Size say; it shows colours, fonts and the watermark, not the size rules.
