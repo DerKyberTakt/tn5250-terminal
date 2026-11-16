@@ -69,6 +69,9 @@ keys.push(
   'ctrl+0',
   'ctrl+numpad_add',
   'ctrl+numpad_subtract',
+  'alt+left',
+  'alt+right',
+  'ctrl+delete',
 );
 
 const pkgPath = new URL('../package.json', import.meta.url);
