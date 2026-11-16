@@ -214,6 +214,11 @@
         "category": "TN5250"
       },
       {
+        "command": "tn5250.find",
+        "title": "Find on Screen",
+        "category": "TN5250"
+      },
+      {
         "command": "tn5250.newTab",
         "title": "New Tab (same session)",
         "category": "TN5250",
@@ -412,6 +417,10 @@
         },
         {
           "command": "tn5250.printScreen",
+          "when": "activeWebviewPanelId == 'tn5250.terminal'"
+        },
+        {
+          "command": "tn5250.find",
           "when": "activeWebviewPanelId == 'tn5250.terminal'"
         },
         {
@@ -2014,6 +2023,11 @@
       },
       {
         "key": "ctrl+r",
+        "command": "tn5250.shadowKey",
+        "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
+      },
+      {
+        "key": "ctrl+f",
         "command": "tn5250.shadowKey",
         "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
       },

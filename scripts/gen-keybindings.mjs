@@ -61,6 +61,7 @@ keys.push(
   'ctrl+v',
   'ctrl+x',
   'ctrl+r',
+  'ctrl+f',
   'ctrl+=',
   'ctrl+shift+=',
   'ctrl+-',
