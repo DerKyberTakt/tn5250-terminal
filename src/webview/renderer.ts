@@ -1,9 +1,11 @@
 import { ATTR_NORMAL, decodeAttribute, isAttribute, type Color } from '../engine/attributes';
 import type { ScreenSnapshot, SnapshotScrollBar, SnapshotWindow } from '../shared/protocol';
-import { decoratedFieldCells, detectSubfiles, fieldRanges, keyLabelsIn, markedFieldRanges, rowText, urlsIn, type FieldRange, type SubfileArea } from '../shared/screenText';
+import { decoratedFieldCells, detectSubfiles, fieldRanges, keyLabelsIn, markedFieldRanges, rowText, urlsIn, visibleRows, type FieldRange, type SubfileArea } from '../shared/screenText';
+import type { FindMatch } from '../shared/screenFind';
 import type { ColumnSeparators, CursorStyle, WatermarkPosition } from '../shared/settings';
 import { highlightScreen, Tok } from '../shared/sourceHighlight';
-import { fitFont } from './fit';
+import { fitFont, shrinkScale } from './fit';
+import { placeWatermark, tileWatermark } from './watermark';
 import { scrollBarGeometry, scrollBarHit, type Rect, type ScrollBarGeometry, type ScrollHit } from './gui';
 
 /** Width of the gutter right of the text where the synthetic subfile scroll bar lives. */
@@ -81,6 +83,8 @@ const SYNTAX_COLORS: Record<number, Color> = {
 export interface Theme {
   background: string;
   colors: Record<Color, string>;
+  /** Background behind text of a colour; missing or '' = the screen background. */
+  backgrounds?: Partial<Record<Color, string>>;
   cursor: string;
   activeField: string;
   ruleLine: string;
@@ -149,6 +153,8 @@ export interface RendererOptions {
   autoFit: boolean;
   /** Auto-fit stretches the screen to fill the viewport (text scaled sideways), as ACS does; off keeps the font's proportions and leaves space. */
   fillWindow: boolean;
+  /** A screen bigger than its box at zoom 1 or less: shrink the drawing to fit, or scroll. */
+  screenOverflow: 'shrink' | 'scroll';
   /** Font size in CSS pixels when autoFit is off. */
   fontSize: number;
   fontStyle: 'plain' | 'bold';
@@ -201,7 +207,8 @@ export class Renderer {
     uiMode: 'classic',
     fontFamily: '',
     autoFit: true,
-    fillWindow: true,
+    fillWindow: false,
+    screenOverflow: 'shrink',
     fontSize: 14,
     fontStyle: 'plain',
     textRendering: 'smooth',
@@ -238,6 +245,8 @@ export class Renderer {
   private cellH = 19;
   /** Sideways scale of the drawing (fill the window); pointer x in CSS px divides by it. */
   private scaleXValue = 1;
+  /** Vertical scale of the whole drawing: 1, or less when the screen is shrunk to fit its box. */
+  private scaleYValue = 1;
   private pad = 0;
   private blinkOn = true;
   private watermarkImage: HTMLImageElement | undefined;
@@ -254,6 +263,9 @@ export class Renderer {
   private thumbPreview: { addr: number; pos: number } | undefined;
   /** Extra canvas width right of the text (synthetic scroll bar). */
   private gutter = 0;
+  /** Find on screen: the matches drawn over the text, and the translucent fill they get. */
+  private findMatches: readonly FindMatch[] = [];
+  private findFill = '';
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -345,8 +357,8 @@ export class Renderer {
 
   /** The scroll bar part at a point in canvas CSS pixels, if any. */
   scrollBarAt(x: number, y: number): ScrollBarTarget | undefined {
-    const px = (x - this.pad) / this.scaleXValue;
-    const py = y - this.pad;
+    const px = (x - this.pad * this.scaleYValue) / this.scaleXValue;
+    const py = (y - this.pad * this.scaleYValue) / this.scaleYValue;
     for (const ref of this.scrollBars()) {
       const geometry = this.geometryFor(ref);
       const hit = scrollBarHit(geometry, px, py);
@@ -422,13 +434,26 @@ export class Renderer {
   /** Converts a point in canvas CSS pixels to a cell, clamped to the screen. */
   cellAt(x: number, y: number): { row: number; col: number } | undefined {
     if (!this.screen) return undefined;
-    const col = Math.min(this.screen.cols - 1, Math.max(0, Math.floor((x - this.pad) / this.scaleXValue / this.cellW)));
-    const row = Math.min(this.screen.rows - 1, Math.max(0, Math.floor((y - this.pad) / this.cellH)));
+    const col = Math.min(this.screen.cols - 1, Math.max(0, Math.floor((x - this.pad * this.scaleYValue) / this.scaleXValue / this.cellW)));
+    const row = Math.min(this.screen.rows - 1, Math.max(0, Math.floor((y - this.pad * this.scaleYValue) / this.scaleYValue / this.cellH)));
     return { row, col };
   }
 
   rowText(row: number): string {
     return this.screen ? rowText(this.screen, row) : '';
+  }
+
+  /** The screen's rows as they are seen (nulls and nondisplay cells blank), for find on screen. */
+  visibleRows(): string[] | undefined {
+    return this.screen ? visibleRows(this.screen) : undefined;
+  }
+
+  /** Shows the find on screen matches, a translucent fill over each; an empty list takes them off. */
+  setFindMatches(matches: readonly FindMatch[], fill: string): void {
+    if (matches.length === 0 && this.findMatches.length === 0) return;
+    this.findMatches = matches;
+    this.findFill = fill;
+    this.draw();
   }
 
   /** Plain text of the screen (nulls as spaces), for copying. */
@@ -477,17 +502,23 @@ export class Renderer {
     this.fontPx = m.px;
     this.cellW = m.cellW;
     this.cellH = m.cellH;
-    this.scaleXValue = m.scaleX;
-    const cssW = m.cssW + this.gutter;
-    const cssH = m.cssH;
+    const fullW = m.cssW + this.gutter;
+    const fullH = m.cssH;
+    // A screen that does not fit at zoom 1 or less (fixed font, small window) is shrunk so it
+    // all stays in view; zoomed in, it scrolls, as the user asked for a bigger screen.
+    const shrink = this.options.screenOverflow !== 'scroll' && this.options.zoom <= 1 ? shrinkScale(fullW, fullH, this.viewportW, this.viewportH) : 1;
+    this.scaleXValue = m.scaleX * shrink;
+    this.scaleYValue = shrink;
+    const cssW = Math.floor(fullW * shrink);
+    const cssH = Math.floor(fullH * shrink);
     const dpr = window.devicePixelRatio || 1;
     this.canvas.style.width = `${cssW}px`;
     this.canvas.style.height = `${cssH}px`;
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
-    // The whole drawing is stretched sideways by scaleX: cells, text, boxes and scroll bars
-    // keep their drawing coordinates and land on the stretched canvas.
-    this.ctx.setTransform(dpr * this.scaleXValue, 0, 0, dpr, this.pad, this.pad);
+    // The whole drawing is stretched sideways by scaleX (and shrunk by scaleY when it has to
+    // fit): cells, text, boxes and scroll bars keep their drawing coordinates.
+    this.ctx.setTransform(dpr * this.scaleXValue, 0, 0, dpr * this.scaleYValue, this.pad * shrink, this.pad * shrink);
     // Only a zoomed-in screen may scroll. A fitted one never shows scrollbars, so they can
     // never narrow the box and start the resize loop again.
     this.canvas.parentElement?.classList.toggle('overflow', cssW > this.viewportW || cssH > this.viewportH);
@@ -577,8 +608,12 @@ export class Renderer {
       const kind = this.syntax?.[i];
       if (kind && current.color === 'green' && !current.reverse) fg = this.theme.colors[SYNTAX_COLORS[kind] ?? 'green'];
 
+      const bg = this.theme.backgrounds?.[current.color] || '';
       if (current.reverse) {
         ctx.fillStyle = fg;
+        ctx.fillRect(x, y, this.cellW + 0.5, this.cellH);
+      } else if (bg && ch !== NULL) {
+        ctx.fillStyle = bg;
         ctx.fillRect(x, y, this.cellW + 0.5, this.cellH);
       }
       // Enhanced mode replaces the underline of input fields with boxes; everything else
@@ -609,6 +644,13 @@ export class Renderer {
     if (this.options.underlineUrls) this.drawUrlUnderlines();
     this.drawWatermark(w, h);
     if (this.options.demoMode) this.drawDemo(w, h);
+
+    // Find on screen: a fill over every match. VS Code's find highlight is never opaque, so
+    // the text shows through, on reverse image fields too.
+    if (this.findMatches.length > 0 && this.findFill) {
+      ctx.fillStyle = this.findFill;
+      for (const m of this.findMatches) ctx.fillRect(this.x(m.col), this.y(m.row), m.length * this.cellW, this.cellH);
+    }
 
     // Selection rectangle (Classic mode; Enhanced draws its box under the text).
     if (this.selection && !enhanced) {
@@ -1087,20 +1129,7 @@ export class Renderer {
     const pad = o.watermarkPadding;
     const p = o.watermarkPosition;
     const tile = p === 'tile';
-    const place = (mw: number, mh: number): [number, number] => {
-      let x = (w - mw) / 2;
-      let y = (h - mh) / 2;
-      if (p === 'custom') {
-        const pct = (v: number): number => Math.max(0, Math.min(100, v)) / 100;
-        x = (w - mw) * pct(o.watermarkX);
-        y = (h - mh) * pct(o.watermarkY);
-      }
-      if (p.startsWith('top')) y = pad;
-      if (p.startsWith('bottom')) y = h - mh - pad;
-      if (p.endsWith('Left')) x = pad;
-      if (p.endsWith('Right')) x = w - mw - pad;
-      return [x + o.watermarkOffsetX, y + o.watermarkOffsetY];
-    };
+    const place = (mw: number, mh: number): [number, number] => placeWatermark({ position: p, x: o.watermarkX, y: o.watermarkY, padding: pad, offsetX: o.watermarkOffsetX, offsetY: o.watermarkOffsetY }, w, h, mw, mh);
     /** Draws one mark, or (tile) repeats it over the whole screen in a brick pattern shifted by the offsets. */
     const stamp = (mw: number, mh: number, draw: (x: number, y: number) => void): void => {
       if (!tile) {
@@ -1108,12 +1137,7 @@ export class Renderer {
         draw(x, y);
         return;
       }
-      const gap = Math.max(8, pad * 2);
-      const stepX = mw + gap;
-      const stepY = mh + gap;
-      const mod = (a: number, b: number): number => ((a % b) + b) % b;
-      const x0 = mod(o.watermarkOffsetX, stepX) - stepX;
-      const y0 = mod(o.watermarkOffsetY, stepY) - stepY;
+      const { stepX, stepY, x0, y0 } = tileWatermark({ gap: pad, offsetX: o.watermarkOffsetX, offsetY: o.watermarkOffsetY }, mw, mh);
       for (let row = 0, y = y0; y < h; row++, y += stepY) {
         const shift = row % 2 ? stepX / 2 : 0;
         for (let x = x0 - shift; x < w; x += stepX) draw(x, y);
@@ -1194,6 +1218,11 @@ export class Renderer {
 
   get hasSelection(): boolean {
     return this.selection !== undefined;
+  }
+
+  /** The selected cells (inclusive), or undefined when nothing is selected. */
+  get selectionBounds(): { row1: number; col1: number; row2: number; col2: number } | undefined {
+    return this.selection && { ...this.selection };
   }
 
   /** Text inside the selection rectangle (whole screen when nothing is selected), nondisplay cells masked. */

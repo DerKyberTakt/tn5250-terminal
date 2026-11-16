@@ -2,7 +2,7 @@
   "name": "tn5250-terminal",
   "displayName": "TN5250 Terminal for IBM i",
   "description": "5250 terminal emulator for IBM i (AS/400) that opens as a VS Code editor tab. Pure TypeScript TN5250 client, nothing else to install.",
-  "version": "0.2.4",
+  "version": "0.2.7",
   "publisher": "DerKyberTakt",
   "license": "MIT",
   "private": true,
@@ -214,6 +214,11 @@
         "category": "TN5250"
       },
       {
+        "command": "tn5250.find",
+        "title": "Find on Screen",
+        "category": "TN5250"
+      },
+      {
         "command": "tn5250.newTab",
         "title": "New Tab (same session)",
         "category": "TN5250",
@@ -285,12 +290,65 @@
         "command": "tn5250.setCertPassphrase",
         "title": "Set TLS Certificate Passphrase (defaults)",
         "category": "TN5250"
+      },
+      {
+        "command": "tn5250.agent.refresh",
+        "title": "Refresh Agent Sessions",
+        "category": "TN5250",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "tn5250.agent.setup",
+        "title": "Set Up Claude Code (.mcp.json)",
+        "category": "TN5250",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "tn5250.agent.enroll",
+        "title": "Enroll User for AI Agent...",
+        "category": "TN5250",
+        "icon": "$(person-add)"
+      },
+      {
+        "command": "tn5250.agent.unenroll",
+        "title": "Remove Agent Enrollment",
+        "category": "TN5250"
+      },
+      {
+        "command": "tn5250.agent.watch",
+        "title": "Watch in Terminal",
+        "category": "TN5250",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "tn5250.agent.popOut",
+        "title": "Watch in Editor Area",
+        "category": "TN5250",
+        "icon": "$(screen-full)"
+      },
+      {
+        "command": "tn5250.agent.newWindow",
+        "title": "Watch in New Window",
+        "category": "TN5250",
+        "icon": "$(multiple-windows)"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "tn5250.shadowKey",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.agent.watch",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.agent.popOut",
+          "when": "false"
+        },
+        {
+          "command": "tn5250.agent.newWindow",
           "when": "false"
         },
         {
@@ -359,6 +417,10 @@
         },
         {
           "command": "tn5250.printScreen",
+          "when": "activeWebviewPanelId == 'tn5250.terminal'"
+        },
+        {
+          "command": "tn5250.find",
           "when": "activeWebviewPanelId == 'tn5250.terminal'"
         },
         {
@@ -453,9 +515,39 @@
           "command": "tn5250.macros",
           "when": "view == tn5250.macrosView",
           "group": "1_more@2"
+        },
+        {
+          "command": "tn5250.agent.refresh",
+          "when": "view == tn5250.agents",
+          "group": "navigation@1"
+        },
+        {
+          "command": "tn5250.agent.setup",
+          "when": "view == tn5250.agents",
+          "group": "navigation@2"
+        },
+        {
+          "command": "tn5250.agent.enroll",
+          "when": "view == tn5250.agents",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
+        {
+          "command": "tn5250.agent.watch",
+          "when": "view == tn5250.agents && viewItem == agent-session",
+          "group": "inline@1"
+        },
+        {
+          "command": "tn5250.agent.popOut",
+          "when": "view == tn5250.agents && viewItem == agent-session",
+          "group": "inline@2"
+        },
+        {
+          "command": "tn5250.agent.newWindow",
+          "when": "view == tn5250.agents && viewItem == agent-session",
+          "group": "inline@3"
+        },
         {
           "command": "tn5250.connectSession",
           "when": "view == tn5250.sessions && viewItem =~ /^session/",
@@ -628,7 +720,18 @@
           "enum": [
             37,
             273,
+            277,
+            278,
+            280,
+            284,
+            285,
+            297,
             500,
+            870,
+            871,
+            875,
+            1025,
+            1026,
             1140,
             1141,
             1142,
@@ -638,7 +741,8 @@
             1146,
             1147,
             1148,
-            1149
+            1149,
+            1153
           ],
           "description": "TN5250: EBCDIC code page the host reads keystrokes with. Match the host's CCSID (QCCSID or the user profile), or passwords with characters such as ! @ # [ ] fail with CPF1120. Set it on the TN5250 Settings page."
         },
@@ -769,9 +873,18 @@
           "description": "TN5250: auto fit. Set it on the TN5250 Settings page."
         },
         "tn5250.font.fillWindow": {
-          "default": true,
+          "default": false,
           "type": "boolean",
           "description": "TN5250: with auto fit, stretch the screen to fill the window (as ACS). Set it on the TN5250 Settings page."
+        },
+        "tn5250.font.screenOverflow": {
+          "default": "shrink",
+          "type": "string",
+          "enum": [
+            "shrink",
+            "scroll"
+          ],
+          "description": "TN5250: a screen bigger than its box (fixed font size, small window) is shrunk to fit, or gets scroll bars. Set it on the TN5250 Settings page."
         },
         "tn5250.font.family": {
           "default": "",
@@ -892,6 +1005,41 @@
           "default": "#6a9cff",
           "type": "string",
           "description": "TN5250: color blue. Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.greenBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind green text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.whiteBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind white text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.redBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind red text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.turquoiseBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind turquoise text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.yellowBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind yellow text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.pinkBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind pink text (blank = screen background). Set it on the TN5250 Settings page."
+        },
+        "tn5250.colors.blueBackground": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: background behind blue text (blank = screen background). Set it on the TN5250 Settings page."
         },
         "tn5250.colors.background": {
           "default": "#000000",
@@ -1125,6 +1273,16 @@
           "type": "boolean",
           "description": "TN5250: warn on close multiple. Set it on the TN5250 Settings page."
         },
+        "tn5250.tabs.color": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: a colour stripe on the tab (desktop app). Set it on the TN5250 Settings page."
+        },
+        "tn5250.tabs.icon": {
+          "default": "",
+          "type": "string",
+          "description": "TN5250: a short mark (emoji or letters) before the tab title. Set it on the TN5250 Settings page."
+        },
         "tn5250.behavior.mouseWheelPaging": {
           "default": true,
           "type": "boolean",
@@ -1265,6 +1423,30 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Enhanced UI: opacity of the selection highlight."
+        },
+        "tn5250.agent.enabled": {
+          "scope": "application",
+          "type": "boolean",
+          "default": false,
+          "description": "Show the Agent Sessions view: the 5250 sessions an AI agent holds through tn5250-tui mcp (the console terminal's MCP server), each one watchable in a terminal. Set it on the TN5250 Settings page (AI Agent)."
+        },
+        "tn5250.agent.binary": {
+          "scope": "application",
+          "type": "string",
+          "default": "",
+          "description": "Path of tn5250-tui (the console terminal). Empty: found on PATH or in the installer's folder. Set it on the TN5250 Settings page (AI Agent)."
+        },
+        "tn5250.agent.site": {
+          "scope": "application",
+          "type": "string",
+          "default": "agent",
+          "description": "The tn5250-tui site the agent signs on with (its own user profile, added in tn5250-tui with :sites). Written into .mcp.json by TN5250: Set Up Claude Code. Set it on the TN5250 Settings page (AI Agent)."
+        },
+        "tn5250.agent.readOnly": {
+          "scope": "application",
+          "type": "boolean",
+          "default": true,
+          "description": "Start the agent's server with --read-only: typed text that starts a command that changes things (DLT, CHG, CRT, SBMJOB, CALL, ...) is refused. Set it on the TN5250 Settings page (AI Agent)."
         }
       }
     },
@@ -1845,6 +2027,11 @@
         "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
       },
       {
+        "key": "ctrl+f",
+        "command": "tn5250.shadowKey",
+        "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
+      },
+      {
         "key": "ctrl+=",
         "command": "tn5250.shadowKey",
         "when": "activeWebviewPanelId == 'tn5250.terminal' && !inputFocus"
@@ -1898,6 +2085,14 @@
           "contextualTitle": "TN5250 Sessions"
         },
         {
+          "id": "tn5250.agents",
+          "name": "Agent Sessions",
+          "icon": "media/sidebar.svg",
+          "contextualTitle": "TN5250 Agent Sessions",
+          "visibility": "collapsed",
+          "when": "tn5250.agent.enabled"
+        },
+        {
           "id": "tn5250.macrosView",
           "name": "Macros",
           "icon": "media/sidebar.svg",
@@ -1916,6 +2111,10 @@
       {
         "view": "tn5250.sessions",
         "contents": "No connections yet.\n[New Connection](command:tn5250.newConnection)\n[Import Connections](command:tn5250.importConnections)\nFrom ACS session profiles or Code for IBM i.\n[Settings](command:tn5250.openSettings)"
+      },
+      {
+        "view": "tn5250.agents",
+        "contents": "No agent server is running.\nAn AI agent (Claude Code) drives 5250 sessions through tn5250-tui mcp, the console terminal's MCP server; its sessions appear here and each one can be watched in a terminal.\n[Set Up Claude Code](command:tn5250.agent.setup)\nWrites .mcp.json in the workspace.\n[Enroll User for AI Agent](command:tn5250.agent.enroll)\nLets the agent sign on with one of your connections and your user profile (bypass sign-on), when it cannot have a profile of its own."
       },
       {
         "view": "tn5250.macrosView",

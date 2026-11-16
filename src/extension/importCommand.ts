@@ -35,7 +35,7 @@ export interface ImportOutcome {
 async function askAboutSaved(count: number): Promise<boolean | undefined> {
   const update = {
     label: `$(sync) Update the ${plural(count, 'saved connection')} from the profiles`,
-    detail: "The profile's values win; a trusted certificate, demo mode and bypass sign-on stay. Undo is offered afterwards.",
+    detail: "The profile's values win; a trusted certificate and demo mode stay, and bypass sign-on is never switched off. Undo is offered afterwards.",
     update: true,
   };
   const keep = {

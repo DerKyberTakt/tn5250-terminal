@@ -18,8 +18,8 @@ const commands = new Map(c.commands.map((x) => [x.command, x]));
 const viewIds = new Set(Object.values(c.views).flat().map((v) => v.id));
 
 describe('package.json contributions', () => {
-  it('has the Sessions, Macros and History views in that order', () => {
-    expect(c.views.tn5250?.map((v) => v.name)).toEqual(['Sessions', 'Macros', 'History']);
+  it('has the Sessions, Agent Sessions, Macros and History views in that order', () => {
+    expect(c.views.tn5250?.map((v) => v.name)).toEqual(['Sessions', 'Agent Sessions', 'Macros', 'History']);
   });
 
   it('every menu entry names a contributed command and a contributed view', () => {

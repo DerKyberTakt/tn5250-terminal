@@ -13,7 +13,7 @@ import {
   type SessionOverrides,
   type TerminalSettings,
   type TitlePart, connectionChanges, isConnectionField, reloadPlan,} from '../shared/settings';
-import type { HostToSettings, OpenTabInfo, SettingsToHost } from '../shared/settingsProtocol';
+import type { AgentSettings, AgentStatus, HostToSettings, OpenTabInfo, SettingsToHost } from '../shared/settingsProtocol';
 import { buildDemoScreen } from '../engine/demoScreen';
 import { Renderer } from '../webview/renderer';
 
@@ -30,6 +30,13 @@ let capturing: KeyAction | undefined;
 const capture = new KeyCapture();
 /** The open terminal tabs, so the page can warn before a save that would reload one. */
 let openTabs: OpenTabInfo[] = [];
+/** The AI agent settings as edited, as saved, and what the host knows about the set-up (VS Code only; the desktop app sends none and the page hides its AI Agent entry). */
+let agent: AgentSettings | undefined;
+let agentSaved: AgentSettings | undefined;
+let agentStatus: AgentStatus | undefined;
+let agentDirty = false;
+let pendingAgentSave = false;
+let agentSaveSettle: ReturnType<typeof setTimeout> | undefined;
 /** The chord latched on the visual keyboard while Assign is active (clicks, or keys pressed once something is latched). */
 let vkChord: ClickedChord = { mods: new Set() };
 /** Rebuilds the visual keyboard and its key bar in place (set while the Keyboard page is shown). */
@@ -154,6 +161,10 @@ type FieldSpec = { showIf?: Key; hideIf?: Key; showWhen?: [Key, string[]]; locke
   | { kind: 'bool'; key: Key; label: string; note?: string }
   | { kind: 'select'; key: Key; label: string; options: Array<[string, string]> }
   | { kind: 'color'; key: Key; label: string }
+  /** A text colour with the background behind it (field colours). */
+  | { kind: 'colorPair'; key: Key; bgKey: Key; label: string }
+  /** Small buttons side by side on one row. */
+  | { kind: 'buttonRow'; label: string; buttons: Array<{ text: string; message: 'exportColors' | 'importColors' | 'resetColors'; title: string }> }
   | { kind: 'file'; key: Key; label: string; message: 'browseWatermark' | 'browseFile' }
   | { kind: 'font'; key: Key; label: string }
   | { kind: 'watermarkPreview' }
@@ -164,6 +175,16 @@ type FieldSpec = { showIf?: Key; hideIf?: Key; showWhen?: [Key, string[]]; locke
   | { kind: 'preview' }
 );
 
+
+/** Information bubbles of the AI Agent page (settings outside the profile: tn5250.agent.*). */
+const AGENT_HELP = {
+  enabled: 'Shows the Agent Sessions view in the side bar: the 5250 sessions an AI agent holds through tn5250-tui mcp (the console terminal\u2019s MCP server), each one watchable read-only in a terminal.',
+  binary: 'Path of tn5250-tui, the console terminal. Empty: found on PATH or in the installer\u2019s folder (%LOCALAPPDATA%\\Programs\\tn5250-tui on Windows; ~/.local/bin, /usr/local/bin, /usr/bin elsewhere).',
+  site: 'The tn5250-tui site the agent signs on with: its own user profile and host, added with Enroll below or with :sites in tn5250-tui. Set Up Claude Code writes this name into .mcp.json.',
+  readOnly: 'Starts the agent\u2019s server with --read-only: typed text that starts a command that changes things (DLT, CHG, CRT, SBMJOB, CALL, ...) is refused.',
+  enroll: 'Enroll writes one of your connections, with your sign-on user and password and bypass sign-on, as the agent\u2019s site into the console terminal\u2019s sites file; a modal names the file first, and the next start of tn5250-tui moves the password into the OS secret store. Remove deletes that site again.',
+  setup: 'Writes (or merges) the .mcp.json in the workspace root so Claude Code starts tn5250-tui mcp for the site above. Restart Claude Code in that folder afterwards.',
+};
 
 /** Information bubbles: what each setting does, with generic examples. */
 const HELP: Partial<Record<Key, string>> = {
@@ -189,8 +210,11 @@ const HELP: Partial<Record<Key, string>> = {
   tlsClientCert: 'PKCS#12 (.pfx/.p12) bundle, or the PEM certificate when using separate files.',
   tlsClientKey: 'PEM private key, only for the PEM mode. The passphrase, if any, is set with the button below and kept in the secret store.',
   fontFile: 'Font file imported into the extension storage.',
-  watermarkOffsetX: 'Moves the watermark left (negative) or right (positive) from its position. Drag it in the preview.',
-  watermarkOffsetY: 'Moves the watermark up (negative) or down (positive) from its position. Drag it in the preview.',
+  watermarkOffsetX: 'Moves the watermark left (negative) or right (positive) from its position (Center, a corner, or the tile pattern). Drag it in the preview. A Custom position uses the sliders alone.',
+  watermarkOffsetY: 'Moves the watermark up (negative) or down (positive) from its position (Center, a corner, or the tile pattern). Drag it in the preview. A Custom position uses the sliders alone.',
+  tabColor: 'A colour stripe on this connection\u2019s tab in the desktop app, to tell production from test at a glance. Blank = none.',
+  tabIcon: 'A short mark (an emoji or up to three letters) shown before the title on this connection\u2019s tab. Blank = none.',
+  colorGreenBg: 'Background behind text of this colour. Blank = the screen background.',
   cursorStyle: 'Block fills the whole cell; Underline draws a line under it.',
   pointer: 'Mouse pointer shape over the screen.',
   cursorBlink: 'Blink the cursor. Off keeps it steady.',
@@ -202,8 +226,9 @@ const HELP: Partial<Record<Key, string>> = {
   columnSeparators: 'How the 5250 column separator attribute (turquoise and yellow fields) is drawn: a dot at the base of each cell, a vertical line, or nothing.',
   showStatusLine: 'Show the operator information area under the screen: connection, X SYSTEM / X II, insert mode, message waiting, cursor position.',
   autoFit: 'On: the font scales so the whole screen fits the tab (zoom with Ctrl+wheel, Ctrl+0 resets). Off: the fixed font size below is used.',
-  fillWindow: 'On: the screen is stretched to fill the window, the characters scaled sideways to match, as ACS does. Off: the characters keep their proportions and the space left over stays empty.',
+  fillWindow: 'On: the screen is stretched to fill the window, the characters scaled sideways to match, as ACS does. Off (default): the characters keep their proportions and the space left over stays empty.',
   fontSize: 'Font size in pixels when Font Scaling is off.',
+  screenOverflow: 'A screen bigger than its box (a fixed font size, a small window, or Ctrl+wheel zoomed out) is shrunk so the whole screen stays in view, or kept at size with scroll bars. Zoomed in (Ctrl+wheel, Ctrl and +) it always scrolls.',
   textRendering: 'Smooth = antialiased text. Crisp = cells snapped to whole pixels for sharper edges at small sizes.',
   fontFamily: 'Pick an installed font (monospaced fonts are listed first; untick the filter to see every font) or Browse to import a .ttf/.otf file, which is copied into the extension storage and loaded only for the terminal. Blank uses the VS Code editor font.',
   fontStyle: 'Plain or bold text.',
@@ -286,7 +311,18 @@ const YESNO = (key: Key, label: string, note?: string): FieldSpec => ({ kind: 'b
 const CODEPAGES: Array<[string, string]> = [
   ['37', '037 United States'],
   ['273', '273 Germany / Austria'],
+  ['277', '277 Denmark / Norway'],
+  ['278', '278 Finland / Sweden'],
+  ['280', '280 Italy'],
+  ['284', '284 Spain / Latin America'],
+  ['285', '285 United Kingdom'],
+  ['297', '297 France'],
   ['500', '500 International'],
+  ['870', '870 Latin-2: Czech, Slovak, Polish, Hungarian, Croatian, Romanian ...'],
+  ['871', '871 Iceland'],
+  ['875', '875 Greece'],
+  ['1025', '1025 Cyrillic'],
+  ['1026', '1026 Turkey'],
   ['1140', '1140 United States (euro)'],
   ['1141', '1141 Germany (euro)'],
   ['1142', '1142 Denmark / Norway (euro)'],
@@ -297,6 +333,7 @@ const CODEPAGES: Array<[string, string]> = [
   ['1147', '1147 France (euro)'],
   ['1148', '1148 International (euro)'],
   ['1149', '1149 Iceland (euro)'],
+  ['1153', '1153 Latin-2 (euro)'],
 ];
 
 const whenEnhanced = (v: TerminalSettings): string | undefined => (v.uiMode === 'enhanced' ? 'Not used in the Enhanced screen style.' : undefined);
@@ -386,6 +423,7 @@ const PAGES: Array<{ id: string; title: string; group: string; fields: FieldSpec
       YESNO('autoFit', 'Font Scaling'),
       { ...YESNO('fillWindow', 'Fill the Window'), showIf: 'autoFit' },
       { kind: 'number', key: 'fontSize', label: 'Fixed Font Size', min: 6, max: 72, hideIf: 'autoFit' },
+      { kind: 'select', key: 'screenOverflow', label: 'When the Screen Does Not Fit', options: [['shrink', 'Shrink it to fit the window'], ['scroll', 'Scroll bars']] },
       { kind: 'select', key: 'textRendering', label: 'Antialiasing', options: [['smooth', 'Yes (smooth)'], ['crisp', 'No (crisp, pixel-aligned)']] },
       { kind: 'font', key: 'fontFamily', label: 'Font Name' },
       { kind: 'select', key: 'fontStyle', label: 'Font Style', options: [['plain', 'Plain'], ['bold', 'Bold']] },
@@ -405,8 +443,8 @@ const PAGES: Array<{ id: string; title: string; group: string; fields: FieldSpec
       { kind: 'range', key: 'watermarkY', label: 'Vertical position (%)', min: 0, max: 100, step: 0.5, showWhen: ['watermarkPosition', ['custom']] },
       { kind: 'range', key: 'watermarkPadding', label: 'Edge distance (px)', min: 0, max: 200, step: 1, showWhen: ['watermarkPosition', ['topLeft', 'topRight', 'bottomLeft', 'bottomRight']] },
       { kind: 'range', key: 'watermarkPadding', label: 'Gap between marks (px)', min: 0, max: 200, step: 1, showWhen: ['watermarkPosition', ['tile']] },
-      { kind: 'range', key: 'watermarkOffsetX', label: 'Horizontal offset (px)', min: -600, max: 600, step: 1 },
-      { kind: 'range', key: 'watermarkOffsetY', label: 'Vertical offset (px)', min: -400, max: 400, step: 1 },
+      { kind: 'range', key: 'watermarkOffsetX', label: 'Horizontal offset (px)', min: -600, max: 600, step: 1, showWhen: ['watermarkPosition', ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'tile']] },
+      { kind: 'range', key: 'watermarkOffsetY', label: 'Vertical offset (px)', min: -400, max: 400, step: 1, showWhen: ['watermarkPosition', ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'tile']] },
       { kind: 'range', key: 'watermarkOpacity', label: 'Opacity', min: 0, max: 1, step: 0.05 },
       { kind: 'watermarkPreview' },
     ],
@@ -416,14 +454,23 @@ const PAGES: Array<{ id: string; title: string; group: string; fields: FieldSpec
     title: 'Colors',
     group: 'Appearance',
     fields: [
-      { kind: 'heading', label: 'Field colours' },
-      { kind: 'color', key: 'colorGreen', label: 'Green' },
-      { kind: 'color', key: 'colorWhite', label: 'White' },
-      { kind: 'color', key: 'colorRed', label: 'Red' },
-      { kind: 'color', key: 'colorTurquoise', label: 'Turquoise' },
-      { kind: 'color', key: 'colorYellow', label: 'Yellow' },
-      { kind: 'color', key: 'colorPink', label: 'Pink' },
-      { kind: 'color', key: 'colorBlue', label: 'Blue' },
+      {
+        kind: 'buttonRow',
+        label: 'Colour set',
+        buttons: [
+          { text: 'Export…', message: 'exportColors', title: 'Save every colour on this page to a .json file' },
+          { text: 'Import…', message: 'importColors', title: 'Load the colours from a .json file (Save keeps them)' },
+          { text: 'Reset All', message: 'resetColors', title: 'Every colour on this page back to its default' },
+        ],
+      },
+      { kind: 'heading', label: 'Field colours (text, background)' },
+      { kind: 'colorPair', key: 'colorGreen', bgKey: 'colorGreenBg', label: 'Green' },
+      { kind: 'colorPair', key: 'colorWhite', bgKey: 'colorWhiteBg', label: 'White' },
+      { kind: 'colorPair', key: 'colorRed', bgKey: 'colorRedBg', label: 'Red' },
+      { kind: 'colorPair', key: 'colorTurquoise', bgKey: 'colorTurquoiseBg', label: 'Turquoise' },
+      { kind: 'colorPair', key: 'colorYellow', bgKey: 'colorYellowBg', label: 'Yellow' },
+      { kind: 'colorPair', key: 'colorPink', bgKey: 'colorPinkBg', label: 'Pink' },
+      { kind: 'colorPair', key: 'colorBlue', bgKey: 'colorBlueBg', label: 'Blue' },
       { kind: 'heading', label: 'OIA colours' },
       { kind: 'color', key: 'colorOiaStatus', label: 'Status indicators' },
       { kind: 'color', key: 'colorOiaInfo', label: 'Information indicators' },
@@ -436,9 +483,6 @@ const PAGES: Array<{ id: string; title: string; group: string; fields: FieldSpec
       { kind: 'color', key: 'colorActiveField', label: 'Active field', lockedWhen: whenEnhanced },
       { kind: 'color', key: 'colorRuleLine', label: 'Crosshair ruler' },
       { kind: 'text', key: 'colorColumnSeparator', label: 'Column separator', placeholder: 'blank = field colour, or #rrggbb' },
-      { kind: 'button', label: '', text: 'Export…', message: 'exportColors' },
-      { kind: 'button', label: '', text: 'Import…', message: 'importColors' },
-      { kind: 'button', label: '', text: 'Reset All', message: 'resetColors' },
       { kind: 'preview' },
     ],
   },
@@ -527,7 +571,9 @@ const PAGES: Array<{ id: string; title: string; group: string; fields: FieldSpec
       YESNO('switchToNewTab', 'Switch to new tab when created'),
       YESNO('warnOnCloseMultiple', 'Send a warning when disconnecting multiple tabs'),
       { kind: 'static', label: 'New tab action', text: 'TN5250: New Tab (Ctrl+Alt+N) runs the same session as the focused tab.' },
-      { kind: 'static', label: 'Tab appearance', text: 'VS Code does not allow per-tab colours, fonts or sizes; the title is composed on the Window Title page.' },
+      { kind: 'heading', label: 'Tab appearance (per connection; the title is composed on the Window Title page)' },
+      { kind: 'color', key: 'tabColor', label: 'Tab colour' },
+      { kind: 'text', key: 'tabIcon', label: 'Tab mark', placeholder: 'an emoji or up to 3 letters, e.g. PRD' },
     ],
   },
   { id: 'keyboard', title: 'Keyboard', group: 'Keyboard', fields: [] },
@@ -557,6 +603,8 @@ const PAGES: Array<{ id: string; title: string; group: string; fields: FieldSpec
       },
     ],
   },
+  // Settings outside the profile (VS Code only); drawn by renderAgentPage, hidden when the host sends no agent data.
+  { id: 'agent', title: 'AI Agent', group: 'AI Agent', fields: [] },
 ];
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -616,7 +664,7 @@ function searchFields(query: string): Array<{ page: (typeof PAGES)[number]; fiel
   const out: Array<{ page: (typeof PAGES)[number]; field: FieldSpec }> = [];
   for (const p of PAGES) {
     for (const f of p.fields) {
-      if (f.kind === 'heading' || f.kind === 'preview' || f.kind === 'watermarkPreview' || f.kind === 'static') continue;
+      if (f.kind === 'heading' || f.kind === 'preview' || f.kind === 'watermarkPreview' || f.kind === 'static' || f.kind === 'buttonRow') continue;
       const hay = [f.label, 'key' in f ? String(f.key) : '', 'key' in f ? (HELP[f.key] ?? '') : '', p.title, p.group].join(' ').toLowerCase();
       if (hay.includes(q)) out.push({ page: p, field: f });
     }
@@ -628,6 +676,7 @@ let searchQuery = '';
 /** Filter typed into the Keyboard page's own search box. */
 let keySearch = '';
 let fonts: Array<{ family: string; monospace: boolean }> = [];
+let hostKind: 'vscode' | 'desktop' = 'vscode';
 let watermarkImageData: string | undefined;
 let fontFace: { family: string; url: string } | undefined;
 let monospaceOnly = true;
@@ -671,6 +720,7 @@ function renderNav(): HTMLElement {
   const tree = el('div', 'tree');
   let group = '';
   for (const p of PAGES) {
+    if (p.id === 'agent' && !agent) continue;
     if (p.group !== group) {
       group = p.group;
       tree.append(el('div', 'group', group));
@@ -685,6 +735,19 @@ function renderNav(): HTMLElement {
   }
   nav.append(tree);
   return nav;
+}
+
+/** Export, Import and Reset All of the Colors page. */
+function runColorButton(message: 'exportColors' | 'importColors' | 'resetColors'): void {
+  if (message === 'resetColors') {
+    for (const k of COLOR_KEYS) (values as unknown as Record<string, unknown>)[k] = SETTINGS_DEFAULTS[k];
+    dirty = true;
+    render();
+  } else if (message === 'exportColors') {
+    const out: Record<string, string> = {};
+    for (const k of COLOR_KEYS) out[k] = String(values[k]);
+    post({ type: 'exportColors', values: out });
+  } else post({ type: 'importColors' });
 }
 
 function colorInput(key: Key): HTMLElement {
@@ -712,16 +775,31 @@ function colorInput(key: Key): HTMLElement {
 }
 
 let previewRenderer: Renderer | undefined;
+
+/** The width of a full-size 80-column screen the preview stands for, in CSS px: watermark paddings and offsets scale by preview width / this. */
+const FULL_SCREEN_WIDTH = 1120;
+
+/** The box the preview canvas fills (its CSS size; the fallback is the old fixed preview). */
+function previewBox(canvas: HTMLCanvasElement): { w: number; h: number } {
+  const box = canvas.parentElement;
+  const w = box?.clientWidth || 560;
+  const h = box?.clientHeight || Math.round((w * 3) / 5);
+  return { w, h };
+}
+
 function updatePreview(): void {
   const canvas = document.getElementById('preview') as HTMLCanvasElement | null;
   if (!canvas) return;
   previewRenderer ??= new Renderer(canvas);
   const r = previewRenderer;
   const v = values;
+  const { w, h } = previewBox(canvas);
+  const k = w / FULL_SCREEN_WIDTH;
   r.setTheme({
     background: v.colorBackground,
     cursor: v.colorCursor,
     colors: { green: v.colorGreen, white: v.colorWhite, red: v.colorRed, turquoise: v.colorTurquoise, yellow: v.colorYellow, pink: v.colorPink, blue: v.colorBlue },
+    backgrounds: { green: v.colorGreenBg, white: v.colorWhiteBg, red: v.colorRedBg, turquoise: v.colorTurquoiseBg, yellow: v.colorYellowBg, pink: v.colorPinkBg, blue: v.colorBlueBg },
     activeField: v.colorActiveField,
     ruleLine: v.colorRuleLine,
     columnSeparator: v.colorColumnSeparator,
@@ -747,8 +825,12 @@ function updatePreview(): void {
   });
   r.setOptions({
     uiMode: v.uiMode,
+    // The preview shows colours, fonts and the watermark, not the size rules: it always fits and
+    // fills its box (which has the screen's shape), whatever Font Scaling, Fill the Window and
+    // Fixed Font Size say.
     autoFit: true,
-    fillWindow: v.fillWindow,
+    fillWindow: true,
+    screenOverflow: v.screenOverflow,
     fontFamily: v.fontFamily,
     fontSize: v.fontSize,
     fontStyle: v.fontStyle,
@@ -764,11 +846,11 @@ function updatePreview(): void {
     watermarkText: v.watermarkText,
     watermarkOpacity: v.watermarkOpacity,
     watermarkPosition: v.watermarkPosition,
-    watermarkPadding: Math.round(v.watermarkPadding / 2),
+    watermarkPadding: Math.round(v.watermarkPadding * k),
     watermarkX: v.watermarkX,
     watermarkY: v.watermarkY,
-    watermarkOffsetX: Math.round(v.watermarkOffsetX / 2),
-    watermarkOffsetY: Math.round(v.watermarkOffsetY / 2),
+    watermarkOffsetX: Math.round(v.watermarkOffsetX * k),
+    watermarkOffsetY: Math.round(v.watermarkOffsetY * k),
     underlineUrls: v.hotspotsUrl,
     keyButtons: v.hotspots3d || v.uiMode === 'enhanced',
     demoMode: v.demoMode,
@@ -783,9 +865,15 @@ function updatePreview(): void {
     { start: 24 * 80 - 4 * 80 + 40, length: 10, bypass: false },
   ];
   demo.cursor = { row: 20, col: 20 };
-  // 80 columns at ~7 px per cell fills the 560 px preview; keep rows readable.
-  r.resize(560, 24 * 8.4);
+  // The box has the screen's shape (settings.css .preview), so the fitted font is readable.
+  r.resize(w, h);
   r.setScreen(demo);
+}
+
+/** Redraws the preview when its box changes width (the panel resized); nothing in a test DOM. */
+function followPreviewSize(box: HTMLElement): void {
+  if (typeof ResizeObserver === 'undefined') return;
+  new ResizeObserver(() => updatePreview()).observe(box);
 }
 
 /** A field row; a locked one (lockedWhen) is greyed out, its controls disabled and a red * carries the reason. */
@@ -815,16 +903,24 @@ function renderFieldInner(f: FieldSpec): HTMLElement | undefined {
     c.id = 'preview';
     c.title = 'Drag the watermark to adjust its offset';
     box.append(c);
-    let drag: { x: number; y: number; ox: number; oy: number } | undefined;
+    let drag: { x: number; y: number; ox: number; oy: number; px: number; py: number } | undefined;
     c.onmousedown = (e) => {
-      drag = { x: e.clientX, y: e.clientY, ox: values.watermarkOffsetX, oy: values.watermarkOffsetY };
+      drag = { x: e.clientX, y: e.clientY, ox: values.watermarkOffsetX, oy: values.watermarkOffsetY, px: values.watermarkX, py: values.watermarkY };
     };
     window.addEventListener('mousemove', (e) => {
       if (!drag) return;
-      // The preview is 560 px wide for an 80-column screen; scale to full-size pixels.
-      const scale = 2;
-      values.watermarkOffsetX = Math.round(drag.ox + (e.clientX - drag.x) * scale);
-      values.watermarkOffsetY = Math.round(drag.oy + (e.clientY - drag.y) * scale);
+      if (values.watermarkPosition === 'custom') {
+        // A custom position is a percentage of the screen: the drag moves the sliders.
+        const pct = (d: number, size: number): number => (d / size) * 100;
+        const { w, h } = previewBox(c);
+        values.watermarkX = Math.max(0, Math.min(100, Math.round((drag.px + pct(e.clientX - drag.x, w)) * 2) / 2));
+        values.watermarkY = Math.max(0, Math.min(100, Math.round((drag.py + pct(e.clientY - drag.y, h)) * 2) / 2));
+      } else {
+        // The preview stands for a full-size 80-column screen; scale the drag to its pixels.
+        const scale = FULL_SCREEN_WIDTH / previewBox(c).w;
+        values.watermarkOffsetX = Math.round(drag.ox + (e.clientX - drag.x) * scale);
+        values.watermarkOffsetY = Math.round(drag.oy + (e.clientY - drag.y) * scale);
+      }
       dirty = true;
       updatePreview();
     });
@@ -833,6 +929,7 @@ function renderFieldInner(f: FieldSpec): HTMLElement | undefined {
       drag = undefined;
       render();
     });
+    followPreviewSize(box);
     queueMicrotask(updatePreview);
     return box;
   }
@@ -841,6 +938,7 @@ function renderFieldInner(f: FieldSpec): HTMLElement | undefined {
     const c = el('canvas');
     c.id = 'preview';
     box.append(c);
+    followPreviewSize(box);
     queueMicrotask(updatePreview);
     return box;
   }
@@ -856,6 +954,17 @@ function renderFieldInner(f: FieldSpec): HTMLElement | undefined {
   row.append(label);
   if (f.kind === 'static') {
     row.append(el('span', f.label === 'Warning' ? 'static warn' : 'static', f.text));
+    return row;
+  }
+  if (f.kind === 'buttonRow') {
+    const wrap = el('span', 'buttonrow');
+    for (const spec of f.buttons) {
+      const b = el('button', 'secondary small', spec.text);
+      b.title = spec.title;
+      b.onclick = () => runColorButton(spec.message);
+      wrap.append(b);
+    }
+    row.append(wrap);
     return row;
   }
   if (f.kind === 'button') {
@@ -935,6 +1044,12 @@ function renderFieldInner(f: FieldSpec): HTMLElement | undefined {
   }
   if (f.kind === 'color') {
     row.append(colorInput(key));
+    return row;
+  }
+  if (f.kind === 'colorPair') {
+    const wrap = el('span', 'colorpair');
+    wrap.append(colorInput(key), el('span', 'pair-label', 'on'), colorInput(f.bgKey));
+    row.append(wrap);
     return row;
   }
   if (f.kind === 'file') {
@@ -1367,6 +1482,115 @@ function renderKeyboard(): HTMLElement {
   return box;
 }
 
+/** The AI Agent page: the tn5250.agent.* settings, the enrollment and the Claude Code set-up, with what the host found. */
+function renderAgentPage(): HTMLElement {
+  const box = el('div', 'agentpage');
+  const a = agent;
+  const st = agentStatus;
+  if (!a) return box;
+  const row = (label: string, help: string | undefined, control: HTMLElement): HTMLElement => {
+    const r = el('div', 'row');
+    const lab = el('label', undefined, label);
+    if (help) lab.append(infoBubble(help));
+    r.append(lab, control);
+    return r;
+  };
+  const note = (text: string, warn = false): HTMLElement => {
+    const r = el('div', 'row');
+    r.append(el('span'), el('span', warn ? 'static warn' : 'static', text));
+    return r;
+  };
+  const edited = (): void => {
+    agentDirty = true;
+    renderButtons();
+  };
+  const yesno = (key: 'enabled' | 'readOnly', label: string, help: string): HTMLElement => {
+    const wrap = el('span', 'radios');
+    for (const [v, text] of [
+      [true, 'Yes'],
+      [false, 'No'],
+    ] as Array<[boolean, string]>) {
+      const lab = el('label', 'radio');
+      const r = el('input');
+      r.type = 'radio';
+      r.name = `agent-${key}`;
+      r.checked = a[key] === v;
+      r.onchange = () => {
+        a[key] = v;
+        edited();
+      };
+      lab.append(r, document.createTextNode(text));
+      wrap.append(lab);
+    }
+    return row(label, help, wrap);
+  };
+  // The buttons run commands that read the saved settings, so unsaved edits are saved first.
+  const run = (command: 'setup' | 'enroll' | 'unenroll'): void => {
+    if (agentDirty) {
+      toast('Save the agent settings first.');
+      return;
+    }
+    post({ type: 'agentCommand', command });
+  };
+
+  box.append(
+    el(
+      'p',
+      'note',
+      'An AI agent such as Claude Code drives 5250 sessions through the MCP server of tn5250-tui, the console version of this terminal. Give the agent its own site (a user profile and a host), point Claude Code at it, and watch its sessions in the Agent Sessions view.',
+    ),
+  );
+  box.append(yesno('enabled', 'Agent Sessions view', AGENT_HELP.enabled));
+
+  const file = el('span', 'filerow');
+  const bin = el('input');
+  bin.type = 'text';
+  bin.value = a.binary;
+  bin.placeholder = 'tn5250-tui on PATH';
+  bin.oninput = () => {
+    a.binary = bin.value;
+    edited();
+  };
+  const browse = el('button', 'secondary', 'Browse\u2026');
+  browse.onclick = () => post({ type: 'browseAgentBinary' });
+  file.append(bin, browse);
+  box.append(row('Console terminal (tn5250-tui)', AGENT_HELP.binary, file));
+  if (st) box.append(note(st.binaryFound ? `Found: ${st.binaryFound}` : 'Not found on PATH or in the installer\u2019s folder. Install tn5250-tui (github.com/DerKyberTakt/tn5250-tui) or browse to it.', !st.binaryFound));
+
+  const site = el('input');
+  site.type = 'text';
+  site.value = a.site;
+  site.placeholder = 'agent';
+  site.oninput = () => {
+    a.site = site.value;
+    edited();
+  };
+  box.append(row('Site name', AGENT_HELP.site, site));
+  box.append(yesno('readOnly', 'Read-only server', AGENT_HELP.readOnly));
+
+  box.append(el('h4', 'heading', 'Enrollment'));
+  const siteName = (agentSaved?.site ?? a.site).trim() || 'agent';
+  if (st) box.append(note(st.enrolled ? `${st.enrolled} is enrolled as site "${siteName}" in ${st.sitesFile}.` : `No site "${siteName}" in ${st.sitesFile}.`));
+  const enroll = el('span', 'buttonrow');
+  const e1 = el('button', 'secondary', 'Enroll User for AI Agent\u2026');
+  e1.onclick = () => run('enroll');
+  const e2 = el('button', 'secondary danger', 'Remove Agent Enrollment');
+  e2.disabled = !st?.enrolled;
+  e2.onclick = () => run('unenroll');
+  enroll.append(e1, e2);
+  box.append(row('Agent\u2019s site', AGENT_HELP.enroll, enroll));
+
+  box.append(el('h4', 'heading', 'Claude Code'));
+  if (st) box.append(note(!st.mcpFile ? 'Open a folder first: .mcp.json goes into the workspace root.' : st.mcpConfigured ? `${st.mcpFile} starts the tn5250 server.` : `${st.mcpFile} does not start the tn5250 server yet.`));
+  const setup = el('button', 'secondary', 'Set Up Claude Code');
+  setup.disabled = !st?.mcpFile;
+  setup.onclick = () => run('setup');
+  const sw = el('span');
+  sw.append(setup);
+  box.append(row('Workspace .mcp.json', AGENT_HELP.setup, sw));
+  return box;
+}
+
 /** Titles of the open tabs that a save of the current edits would offer to reload. */
 function pendingReloads(): string[] {
   if (!openTabs.length) return [];
@@ -1381,6 +1605,27 @@ function renderButtons(): void {
   const bar = document.getElementById('buttons');
   if (!bar) return;
   bar.replaceChildren();
+  if (page === 'agent' && !searchQuery.trim() && agent) {
+    // The AI Agent page saves its own values (application-scoped settings, no profile).
+    const a = agent;
+    const save = el('button', 'primary', 'Save Agent Settings');
+    save.disabled = !agentDirty;
+    save.onclick = () => {
+      pendingAgentSave = true;
+      post({ type: 'saveAgent', values: { ...a, binary: a.binary.trim(), site: a.site.trim() || 'agent' } });
+    };
+    const cancel = el('button', 'secondary', 'Revert');
+    cancel.disabled = !agentDirty;
+    cancel.onclick = () => {
+      if (agentSaved) agent = { ...agentSaved };
+      agentDirty = false;
+      render();
+    };
+    const json = el('button', 'link', 'Open in VS Code Settings');
+    json.onclick = () => post({ type: 'openJson' });
+    bar.append(save, cancel, json);
+    return;
+  }
   const pending = pendingReloads();
   if (pending.length) {
     const warn = el('div', 'reload-warn');
@@ -1408,7 +1653,7 @@ function renderButtons(): void {
     remove.onclick = () => post({ type: 'removeSession', index: selected });
     bar.append(remove);
   }
-  const json = el('button', 'link', 'Open in VS Code Settings');
+  const json = el('button', 'link', hostKind === 'desktop' ? 'Open the settings file' : 'Open in VS Code Settings');
   json.onclick = () => post({ type: 'openJson' });
   bar.append(json);
 }
@@ -1422,6 +1667,7 @@ function profileTitle(): string {
 function mainHeading(): string {
   if (searchQuery.trim()) return `${profileTitle()} › Search: ${searchQuery.trim()}`;
   const p = PAGES.find((x) => x.id === page) ?? PAGES[0]!;
+  if (p.id === 'agent') return 'AI Agent › Claude Code and the console terminal';
   return `${profileTitle()} › ${p.group} › ${p.title}`;
 }
 
@@ -1467,6 +1713,7 @@ function renderMain(main: HTMLElement): void {
     const p = PAGES.find((x) => x.id === page) ?? PAGES[0]!;
     main.append(el('h2', undefined, mainHeading()));
     if (p.id === 'keyboard') main.append(renderKeyboard());
+    else if (p.id === 'agent') main.append(renderAgentPage());
     else
       for (const f of p.fields) {
         const node = renderField(f);
@@ -1563,6 +1810,15 @@ function finishSave(): void {
   toast('Settings saved.');
 }
 
+/** The host answered Save Agent Settings (more than once while VS Code writes them): the page is clean again. */
+function finishAgentSave(): void {
+  agentSaveSettle = undefined;
+  pendingAgentSave = false;
+  agentDirty = false;
+  render();
+  toast('Agent settings saved.');
+}
+
 function select(index: number): void {
   selected = index;
   values = profileValues(index);
@@ -1585,6 +1841,14 @@ window.addEventListener('message', (ev: MessageEvent<HostToSettings>) => {
     renderButtons();
     return;
   }
+  if (ev.data.type === 'agentBinary') {
+    if (agent) {
+      agent.binary = ev.data.path;
+      agentDirty = true;
+      render();
+    }
+    return;
+  }
   if (ev.data.type === 'kmp') {
     const count = Object.keys(ev.data.keymap).length;
     values.keymap = { ...values.keymap, ...ev.data.keymap };
@@ -1597,7 +1861,19 @@ window.addEventListener('message', (ev: MessageEvent<HostToSettings>) => {
   if (ev.data.type !== 'data') return;
   defaults = ev.data.defaults;
   sessions = ev.data.sessions;
+  if (ev.data.hostKind) hostKind = ev.data.hostKind;
   if (ev.data.fonts) fonts = ev.data.fonts;
+  if (ev.data.agentStatus) agentStatus = ev.data.agentStatus;
+  if (ev.data.agent) {
+    agentSaved = { ...ev.data.agent };
+    // Unsaved edits on the AI Agent page survive a push (a config change elsewhere); a save takes the stored values.
+    if (!agentDirty || pendingAgentSave) agent = { ...ev.data.agent };
+  }
+  if (pendingAgentSave) {
+    if (agentSaveSettle) clearTimeout(agentSaveSettle);
+    agentSaveSettle = setTimeout(finishAgentSave, SAVE_SETTLE_MS);
+    return;
+  }
   watermarkImageData = ev.data.watermarkImageData;
   fontFace = ev.data.fontFace;
   applyFontFace();
