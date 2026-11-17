@@ -74,6 +74,8 @@ Open the TN5250 Settings page (the gear in the TN5250 side bar, or **TN5250: Ope
 
 These are application-wide settings with their own **Save** button on that page.
 
+![AI Agent settings page](ai-agent-settings.png)
+
 ## 4. Set up Claude Code
 
 In the workspace the agent will work in, run **TN5250: Set Up Claude Code** (Command Palette, the Agent Sessions view's gear, or the AI Agent page). It writes, or merges into, the workspace's `.mcp.json`:

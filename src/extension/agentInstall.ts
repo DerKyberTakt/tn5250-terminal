@@ -9,7 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { execFile } from 'node:child_process';
 
 export const REPO = 'DerKyberTakt/tn5250-tui';
@@ -72,10 +72,16 @@ export interface InstallDeps {
   report?: (text: string) => void;
 }
 
-/** The default extractor: `tar -xf`, which reads zip and tar.gz alike on every supported platform. */
+/**
+ * The default extractor: `tar -xf`, which reads zip and tar.gz alike on every supported
+ * platform. It runs inside dir with the archive's bare name: Windows' bsdtar reads a
+ * `C:\...` path as a remote host ("Cannot connect to C"), so no absolute path is passed.
+ */
 export function tarExtract(archive: string, dir: string): Promise<void> {
+  // Windows: the system's bsdtar (System32) reads zip; a GNU tar from Git on PATH does not.
+  const tar = process.platform === 'win32' && process.env.SystemRoot ? join(process.env.SystemRoot, 'System32', 'tar.exe') : 'tar';
   return new Promise((resolve, reject) => {
-    execFile('tar', ['-xf', archive, '-C', dir], { windowsHide: true }, (err, _stdout, stderr) => {
+    execFile(tar, ['-xf', basename(archive)], { cwd: dir, windowsHide: true }, (err, _stdout, stderr) => {
       if (err) reject(new Error(`tar: ${stderr?.toString().trim() || err.message}`));
       else resolve();
     });
