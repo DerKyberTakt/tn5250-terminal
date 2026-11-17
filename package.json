@@ -2,7 +2,7 @@
   "name": "tn5250-terminal",
   "displayName": "TN5250 Terminal for IBM i",
   "description": "5250 terminal emulator for IBM i (AS/400) that opens as a VS Code editor tab. Pure TypeScript TN5250 client, nothing else to install.",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "publisher": "DerKyberTakt",
   "license": "MIT",
   "private": true,
@@ -331,6 +331,24 @@
         "title": "Watch in New Window",
         "category": "TN5250",
         "icon": "$(multiple-windows)"
+      },
+      {
+        "command": "tn5250.agent.forget",
+        "title": "Forget Agent Server",
+        "category": "TN5250",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "tn5250.agent.cleanUp",
+        "title": "Clean Up Agent Servers",
+        "category": "TN5250",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "tn5250.agent.install",
+        "title": "Install tn5250-tui (Console Terminal)",
+        "category": "TN5250",
+        "icon": "$(cloud-download)"
       }
     ],
     "menus": {
@@ -530,6 +548,11 @@
           "command": "tn5250.agent.enroll",
           "when": "view == tn5250.agents",
           "group": "navigation@3"
+        },
+        {
+          "command": "tn5250.agent.cleanUp",
+          "when": "view == tn5250.agents",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -547,6 +570,16 @@
           "command": "tn5250.agent.newWindow",
           "when": "view == tn5250.agents && viewItem == agent-session",
           "group": "inline@3"
+        },
+        {
+          "command": "tn5250.agent.forget",
+          "when": "view == tn5250.agents && viewItem == agent-server-dead",
+          "group": "inline@1"
+        },
+        {
+          "command": "tn5250.agent.forget",
+          "when": "view == tn5250.agents && viewItem =~ /^agent-server/",
+          "group": "1_more@1"
         },
         {
           "command": "tn5250.connectSession",
@@ -2114,7 +2147,7 @@
       },
       {
         "view": "tn5250.agents",
-        "contents": "No agent server is running.\nAn AI agent (Claude Code) drives 5250 sessions through tn5250-tui mcp, the console terminal's MCP server; its sessions appear here and each one can be watched in a terminal.\n[Set Up Claude Code](command:tn5250.agent.setup)\nWrites .mcp.json in the workspace.\n[Enroll User for AI Agent](command:tn5250.agent.enroll)\nLets the agent sign on with one of your connections and your user profile (bypass sign-on), when it cannot have a profile of its own."
+        "contents": "No agent server is running.\nAn AI agent (Claude Code) drives 5250 sessions through tn5250-tui mcp, the console terminal's MCP server; its sessions appear here and each one can be watched in a terminal.\n[Install tn5250-tui](command:tn5250.agent.install)\nDownloads the console terminal, the agent's server, from its GitHub release (checked against SHA256SUMS) into this extension's storage.\n[Set Up Claude Code](command:tn5250.agent.setup)\nWrites .mcp.json in the workspace.\n[Enroll User for AI Agent](command:tn5250.agent.enroll)\nLets the agent sign on with one of your connections and your user profile (bypass sign-on), when it cannot have a profile of its own."
       },
       {
         "view": "tn5250.macrosView",

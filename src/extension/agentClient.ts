@@ -135,8 +135,32 @@ export function mcpHasServer(existing: string | undefined): boolean {
   }
 }
 
-/** Reads the token files, newest first; unreadable ones are deleted. */
-export function listTokens(dir: string = tokenDir()): AgentToken[] {
+/** Whether a process still runs: a signal-0 probe (EPERM means it exists but is not ours). */
+export function pidAlive(pid: number): boolean {
+  if (!pid) return true;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** Deletes a server's token file (a server that no longer answers, or that the user wants out of the view). */
+export function forgetToken(path: string): void {
+  try {
+    unlinkSync(path);
+  } catch {
+    /* already gone */
+  }
+}
+
+/**
+ * Reads the token files, newest first. Unreadable ones are deleted, and so are those of
+ * servers whose process has ended (a Claude Code session that closed without the server
+ * cleaning up): the view shows what runs now, not every server that ever ran.
+ */
+export function listTokens(dir: string = tokenDir(), alive: (pid: number) => boolean = pidAlive): AgentToken[] {
   let names: string[];
   try {
     names = readdirSync(dir).filter((n) => n.endsWith('.json'));
@@ -149,7 +173,12 @@ export function listTokens(dir: string = tokenDir()): AgentToken[] {
     try {
       const t = JSON.parse(readFileSync(path, 'utf8')) as Partial<AgentToken>;
       if (typeof t.addr !== 'string' || typeof t.token !== 'string') throw new Error('bad');
-      out.push({ pid: Number(t.pid) || 0, addr: t.addr, token: t.token, started: String(t.started ?? ''), label: t.label, path });
+      const token: AgentToken = { pid: Number(t.pid) || 0, addr: t.addr, token: t.token, started: String(t.started ?? ''), label: t.label, path };
+      if (!alive(token.pid)) {
+        forgetToken(path);
+        continue;
+      }
+      out.push(token);
     } catch {
       try {
         unlinkSync(path);
@@ -161,7 +190,10 @@ export function listTokens(dir: string = tokenDir()): AgentToken[] {
   return out.sort((a, b) => b.started.localeCompare(a.started));
 }
 
-/** Where the console terminal's binary is: the setting, else PATH, else the installer's folders. */
+/**
+ * Where the console terminal's binary is: the setting, else the folders in extraDirs (the
+ * copy this extension installed), else PATH, else the installer's folders.
+ */
 export function findBinary(
   setting: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -174,10 +206,11 @@ export function findBinary(
       return false;
     }
   },
+  extraDirs: string[] = [],
 ): string | undefined {
   if (setting.trim()) return setting.trim();
   const name = platform === 'win32' ? 'tn5250-tui.exe' : 'tn5250-tui';
-  const dirs = (env.PATH ?? '').split(platform === 'win32' ? ';' : delimiter).filter(Boolean);
+  const dirs = [...extraDirs, ...(env.PATH ?? '').split(platform === 'win32' ? ';' : delimiter).filter(Boolean)];
   if (platform === 'win32') dirs.push(join(env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'Programs', 'tn5250-tui'));
   else dirs.push(join(homedir(), '.local', 'bin'), '/usr/local/bin', '/usr/bin');
   for (const d of dirs) {

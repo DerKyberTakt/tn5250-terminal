@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { AgentSettings, AgentStatus, HostToSettings, SettingsAssets, SettingsToHost } from '../shared/settingsProtocol';
 import { enrolledUser, findBinary, mcpHasServer, sitesPath } from './agentClient';
+import { installedBinary } from './agentInstall';
 import { COLOR_KEYS, copySessionAt, describeChange, reloadPlan, resolveSettings, type TerminalSettings } from '../shared/settings';
 import { pickKmp } from './kmpCommand';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
@@ -125,7 +126,8 @@ export class SettingsPanel {
       }
     };
     let binaryFound = '';
-    const bin = findBinary(a.binary);
+    const installed = installedBinary(vscode.Uri.joinPath(this.context.globalStorageUri, 'tn5250-tui').fsPath, process.platform);
+    const bin = findBinary(a.binary, undefined, undefined, undefined, installed ? [path.dirname(installed)] : []);
     if (bin) {
       try {
         await vscode.workspace.fs.stat(vscode.Uri.file(bin));
@@ -320,6 +322,10 @@ export class SettingsPanel {
       }
       case 'agentCommand':
         await vscode.commands.executeCommand(`tn5250.agent.${msg.command}`);
+        this.push();
+        break;
+      case 'installAgentBinary':
+        await vscode.commands.executeCommand('tn5250.agent.install');
         this.push();
         break;
       case 'browseAgentBinary': {

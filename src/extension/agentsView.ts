@@ -1,21 +1,41 @@
 import { dirname } from 'node:path';
 import * as vscode from 'vscode';
-import { attachArgs, enrollSite, fetchSessions, findBinary, listTokens, mergeMcpJson, removeSite, sitesPath, type AgentSession, type AgentToken } from './agentClient';
+import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, removeSite, sitesPath, type AgentSession, type AgentToken } from './agentClient';
+import { installRelease, installedBinary, latestTag, tarExtract } from './agentInstall';
 import { findPassword } from './secretKeys';
 import { resolvedSessions } from './settingsStore';
 
+type Icon = { light: vscode.Uri; dark: vscode.Uri };
+/** The Sessions view's green (connected) and grey (off) session icons, shared so the two views read alike. */
+export type AgentIcons = { on: Icon; off: Icon };
+
 /** A running `tn5250-tui mcp` server (one Claude Code session, usually). */
 export class AgentServerItem extends vscode.TreeItem {
+  /** Sessions of this server connected to a host. */
+  readonly connected: number;
+
   constructor(
     readonly token: AgentToken,
     readonly sessions: AgentSession[] | undefined,
+    icons: AgentIcons,
   ) {
-    super(token.label || `pid ${token.pid}`, vscode.TreeItemCollapsibleState.Expanded);
-    this.description = sessions ? `${sessions.length} session${sessions.length === 1 ? '' : 's'} · ${token.addr}` : `not answering · ${token.addr}`;
-    this.iconPath = new vscode.ThemeIcon(sessions ? 'server-process' : 'debug-disconnect');
-    this.contextValue = 'agent-server';
+    super(token.label || `pid ${token.pid}`, sessions?.length ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None);
+    this.connected = sessions?.filter((s) => s.connected).length ?? 0;
+    const idle = sessions ? sessions.length - this.connected : 0;
+    const state = !sessions
+      ? 'not answering'
+      : this.connected
+        ? `${this.connected} connected${idle ? ` · ${idle} disconnected` : ''}`
+        : sessions.length
+          ? `${sessions.length} disconnected`
+          : 'idle';
+    this.description = `${state} · ${token.addr}`;
+    this.iconPath = !sessions ? new vscode.ThemeIcon('debug-disconnect') : this.connected ? icons.on : icons.off;
+    this.contextValue = sessions ? 'agent-server' : 'agent-server-dead';
     this.id = `agent-server:${token.addr}`;
-    this.tooltip = `tn5250-tui mcp, pid ${token.pid}\nstarted ${token.started}\n${token.path}`;
+    this.tooltip =
+      `tn5250-tui mcp, pid ${token.pid}\nstarted ${token.started}\n${token.path}` +
+      (sessions ? '' : '\nNot answering: the server may have ended. Forget removes its entry; the view also drops servers whose process is gone.');
   }
 }
 
@@ -24,11 +44,12 @@ export class AgentSessionItem extends vscode.TreeItem {
   constructor(
     readonly token: AgentToken,
     readonly session: AgentSession,
+    icons: AgentIcons,
   ) {
     super(session.session, vscode.TreeItemCollapsibleState.None);
     const state = session.connected ? (session.inhibited && session.inhibited !== 'none' ? 'host busy' : 'connected') : 'disconnected';
     this.description = [session.host, session.device, state].filter(Boolean).join(' · ');
-    this.iconPath = new vscode.ThemeIcon(session.connected ? 'window' : 'debug-disconnect');
+    this.iconPath = session.connected ? icons.on : icons.off;
     this.contextValue = 'agent-session';
     this.id = `agent-session:${token.addr}/${session.session}`;
     this.tooltip = `${session.session} on ${session.host}${session.device ? ` (${session.device})` : ''}\n${state}, screen ${session.seq}\nClick: watch it in a terminal (read-only)`;
@@ -50,8 +71,11 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
   private timer: ReturnType<typeof setInterval> | undefined;
   private servers: AgentServerItem[] = [];
   private readonly terminals = new Map<string, vscode.Terminal>();
+  private readonly icons: AgentIcons;
 
   constructor(private readonly context: vscode.ExtensionContext) {
+    const media = (name: string): vscode.Uri => vscode.Uri.joinPath(context.extensionUri, 'media', name);
+    this.icons = { on: { light: media('session-on.svg'), dark: media('session-on.svg') }, off: { light: media('session-off.svg'), dark: media('session-off.svg') } };
     context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('tn5250.agent')) this.schedule();
@@ -94,27 +118,56 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     this.timer = undefined;
   }
 
-  /** Reads the token files and asks every server for its sessions. */
+  /**
+   * Reads the token files (servers whose process ended are dropped there) and asks every
+   * server for its sessions. Servers with connected sessions come first, then idle ones,
+   * then those that do not answer.
+   */
   async poll(): Promise<void> {
     const tokens = listTokens();
     const servers = await Promise.all(
       tokens.map(async (t) => {
         try {
-          return new AgentServerItem(t, await fetchSessions(t));
+          return new AgentServerItem(t, await fetchSessions(t), this.icons);
         } catch {
-          return new AgentServerItem(t, undefined);
+          return new AgentServerItem(t, undefined, this.icons);
         }
       }),
     );
+    const rank = (s: AgentServerItem): number => (s.connected ? 0 : s.sessions ? 1 : 2);
+    servers.sort((a, b) => rank(a) - rank(b));
     const before = JSON.stringify(this.servers.map((s) => [s.id, s.description, s.sessions?.map((x) => [x.session, x.connected, x.inhibited])]));
     const after = JSON.stringify(servers.map((s) => [s.id, s.description, s.sessions?.map((x) => [x.session, x.connected, x.inhibited])]));
     this.servers = servers;
     if (before !== after) this.changed.fire(undefined);
-    const n = servers.reduce((sum, s) => sum + (s.sessions?.filter((x) => x.connected).length ?? 0), 0);
+    const n = servers.reduce((sum, s) => sum + s.connected, 0);
     if (this.view) {
       this.view.badge = n ? { value: n, tooltip: `${n} agent session${n === 1 ? '' : 's'} connected` } : undefined;
-      this.view.description = AgentsProvider.enabled ? (servers.length ? undefined : 'no server running') : 'off';
+      const idle = servers.filter((s) => s.sessions).length;
+      this.view.description = !AgentsProvider.enabled
+        ? 'off'
+        : n
+          ? `${n} connected`
+          : servers.length
+            ? idle
+              ? `${idle} server${idle === 1 ? '' : 's'} idle`
+              : 'not answering'
+            : 'no server running';
     }
+  }
+
+  /** Forget: removes one server's token file; it comes back only if that server registers again. */
+  forget(item: AgentServerItem): void {
+    forgetToken(item.token.path);
+    void this.poll();
+  }
+
+  /** Clean Up: forgets every server that does not answer (servers whose process is gone are dropped on every poll). */
+  cleanUp(): void {
+    const dead = this.servers.filter((s) => !s.sessions);
+    for (const s of dead) forgetToken(s.token.path);
+    void vscode.window.showInformationMessage(dead.length ? `TN5250: ${dead.length} agent server${dead.length === 1 ? '' : 's'} forgotten.` : 'TN5250: every listed agent server answers; nothing to clean up.');
+    void this.poll();
   }
 
   refresh(): void {
@@ -126,19 +179,61 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
   }
 
   getChildren(element?: AgentNode): AgentNode[] {
-    if (element instanceof AgentServerItem) return (element.sessions ?? []).map((s) => new AgentSessionItem(element.token, s));
+    if (element instanceof AgentServerItem) return (element.sessions ?? []).map((s) => new AgentSessionItem(element.token, s, this.icons));
     if (element) return [];
     return this.servers;
   }
 
-  /** The binary, or a message telling the user how to get it. */
-  private binary(): string | undefined {
+  /** Where Install tn5250-tui puts the console terminal: a folder of this extension's own. */
+  installDir(): string {
+    return vscode.Uri.joinPath(this.context.globalStorageUri, 'tn5250-tui').fsPath;
+  }
+
+  /** The console terminal: the setting, the copy installed here, PATH, the installer's folder. */
+  findBinary(): string | undefined {
     const setting = vscode.workspace.getConfiguration('tn5250').get<string>('agent.binary', '');
-    const bin = findBinary(setting);
+    return findBinary(setting, undefined, undefined, undefined, [...(installedBinary(this.installDir(), process.platform) ? [dirname(installedBinary(this.installDir(), process.platform)!)] : [])]);
+  }
+
+  /**
+   * Install tn5250-tui: the latest release for this platform, from GitHub, checked against the
+   * release's SHA256SUMS, unpacked into the extension's storage. The binary is then found
+   * without any PATH work; the setting may stay empty.
+   */
+  async install(): Promise<string | undefined> {
+    const dir = this.installDir();
+    try {
+      return await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'TN5250: installing tn5250-tui' }, async (progress) => {
+        const deps = {
+          fetch: (url: string, init?: { redirect?: 'follow' | 'manual' }) => fetch(url, init),
+          extract: tarExtract,
+          platform: process.platform,
+          arch: process.arch,
+          report: (text: string) => progress.report({ message: text }),
+        };
+        progress.report({ message: 'Looking up the latest release…' });
+        const tag = await latestTag(deps);
+        const bin = await installRelease(dir, tag, deps);
+        void vscode.window.showInformationMessage(`TN5250: tn5250-tui ${tag} installed: ${bin}`);
+        this.refresh();
+        return bin;
+      });
+    } catch (e) {
+      void vscode.window.showErrorMessage(`TN5250: could not install tn5250-tui: ${(e as Error).message}`);
+      return undefined;
+    }
+  }
+
+  /** The binary, or an offer to install it. */
+  private binary(): string | undefined {
+    const bin = this.findBinary();
     if (!bin) {
       void vscode.window
-        .showWarningMessage('TN5250: tn5250-tui (the console terminal) was not found on PATH. Install it or set tn5250.agent.binary.', 'Open Settings')
-        .then((pick) => pick && vscode.commands.executeCommand('workbench.action.openSettings', 'tn5250.agent.binary'));
+        .showWarningMessage('TN5250: tn5250-tui (the console terminal) was not found. Install it here, or set tn5250.agent.binary.', 'Install tn5250-tui', 'Open Settings')
+        .then((pick) => {
+          if (pick === 'Install tn5250-tui') void this.install();
+          else if (pick) void vscode.commands.executeCommand('workbench.action.openSettings', 'tn5250.agent.binary');
+        });
     }
     return bin;
   }
@@ -209,18 +304,6 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     const cfg = vscode.workspace.getConfiguration('tn5250');
     const siteName = cfg.get<string>('agent.site', 'agent').trim() || 'agent';
     const path = sitesPath();
-    const ok = await vscode.window.showWarningMessage(
-      `Enroll ${user}@${session.host} for the AI agent?`,
-      {
-        modal: true,
-        detail:
-          `The agent signs on as ${user} with your password, with bypass sign-on turned on, and everything it does on the host is logged under your profile.\n\n` +
-          `Your password is written to the console terminal's sites file:\n${path}\n(site "${siteName}"). The next start of tn5250-tui or its MCP server moves it from there into the OS secret store (Credential Manager, Keychain, Secret Service); until then the file holds it in clear text, readable by every program running as you.\n\n` +
-          `Remove it any time with TN5250: Remove Agent Enrollment, or :sites in tn5250-tui.`,
-      },
-      'Enroll',
-    );
-    if (ok !== 'Enroll') return;
     const target = vscode.Uri.file(path);
     let existing: string | undefined;
     try {
@@ -228,6 +311,25 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     } catch {
       existing = undefined;
     }
+    // An enrolled site is replaced, and the dialog says so: a second Enroll used to look
+    // like it did nothing (the file changed, but nothing on screen said what had been there).
+    const was = enrolledUser(existing, siteName);
+    const replacing = !!was;
+    const ok = await vscode.window.showWarningMessage(
+      replacing ? `Replace the AI agent's enrollment ${was} with ${user}@${session.host}?` : `Enroll ${user}@${session.host} for the AI agent?`,
+      {
+        modal: true,
+        detail:
+          (replacing
+            ? `Site "${siteName}" is enrolled as ${was}. Its host, user and password are replaced; a tn5250-tui MCP server that is already running keeps the old sign-on until it is restarted (in Claude Code: /mcp, reconnect tn5250).\n\n`
+            : '') +
+          `The agent signs on as ${user} with your password, with bypass sign-on turned on, and everything it does on the host is logged under your profile.\n\n` +
+          `Your password is written to the console terminal's sites file:\n${path}\n(site "${siteName}"). The next start of tn5250-tui or its MCP server moves it from there into the OS secret store (Credential Manager, Keychain, Secret Service); until then the file holds it in clear text, readable by every program running as you.\n\n` +
+          `Remove it any time with TN5250: Remove Agent Enrollment, or :sites in tn5250-tui.`,
+      },
+      replacing ? 'Replace' : 'Enroll',
+    );
+    if (ok !== (replacing ? 'Replace' : 'Enroll')) return;
     let text: string;
     try {
       text = enrollSite(existing, {
@@ -249,7 +351,16 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     }
     await vscode.workspace.fs.createDirectory(vscode.Uri.file(dirname(path)));
     await vscode.workspace.fs.writeFile(target, Buffer.from(text, 'utf8'));
-    const next = await vscode.window.showInformationMessage(`TN5250: ${user}@${session.host} enrolled as site "${siteName}" in ${path}.`, 'Set Up Claude Code');
+    // Read it back: the message reports what the file holds, not what was meant to be written.
+    const now = enrolledUser(Buffer.from(await vscode.workspace.fs.readFile(target)).toString('utf8'), siteName);
+    if (now.toUpperCase() !== `${user}@${session.host}`.toUpperCase()) {
+      void vscode.window.showErrorMessage(`TN5250: ${path} shows site "${siteName}" as ${now || 'missing'} after the write; check the file.`);
+      return;
+    }
+    const next = await vscode.window.showInformationMessage(
+      `TN5250: ${user}@${session.host} enrolled as site "${siteName}" in ${path}${replacing ? ` (was ${was}; restart a running agent server for it to take effect)` : ''}.`,
+      'Set Up Claude Code',
+    );
     if (next) await this.setup();
   }
 
@@ -287,7 +398,7 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
       return;
     }
     const cfg = vscode.workspace.getConfiguration('tn5250');
-    const bin = findBinary(cfg.get<string>('agent.binary', '')) ?? 'tn5250-tui';
+    const bin = this.findBinary() ?? 'tn5250-tui';
     const site = cfg.get<string>('agent.site', 'agent');
     const readOnly = cfg.get<boolean>('agent.readOnly', true);
     const target = vscode.Uri.joinPath(folder.uri, '.mcp.json');
