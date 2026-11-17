@@ -11,7 +11,7 @@ import { watchRecording, MacroRecorder } from '../shared/macros';
 import { deleteMacro, exportMacros, importMacros, macroActions, macroStore, manageMacros, newEmptyMacro, pickAndRun, playMacro, saveRecordedMacro, stopMacro } from './macros';
 import { MacroItem, MacrosProvider } from './macrosView';
 import { setCertPassphraseInteractive, setPasswordInteractive } from './secrets';
-import { AgentSessionItem, AgentsProvider } from './agentsView';
+import { AgentServerItem, AgentSessionItem, AgentsProvider } from './agentsView';
 
 const LAST_SESSION_KEY = 'tn5250.lastSession';
 
@@ -215,6 +215,8 @@ export function activate(context: vscode.ExtensionContext): void {
   register('tn5250.agent.watch', (item: AgentSessionItem) => agents.watch(item));
   register('tn5250.agent.popOut', (item: AgentSessionItem) => agents.popOut(item, 'editor'));
   register('tn5250.agent.newWindow', (item: AgentSessionItem) => agents.popOut(item, 'window'));
+  register('tn5250.agent.forget', (item: AgentServerItem) => agents.forget(item));
+  register('tn5250.agent.cleanUp', () => agents.cleanUp());
 
   // Macros: recorded in the active tab, run by key, from the Macros view or from the lists.
   macroStore.init(context);

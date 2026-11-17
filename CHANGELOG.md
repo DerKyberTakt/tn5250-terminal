@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.8 - unreleased
+- Agent Sessions: the view's title says how many agent sessions are connected, a server with a connected session and the session itself carry the green session icon of the Sessions view (grey when disconnected), and servers with connected sessions sort first. Servers whose process has ended no longer linger in the list: their registration is dropped as soon as the view looks. A server that still runs but does not answer shows as such with a Forget button; Clean Up Agent Servers (view title) forgets all of them at once.
+- Enroll User for AI Agent on a site that is already enrolled now says so: the dialog names the current enrollment, asks to Replace it, and the message afterwards reports what the file holds (read back) and that a running agent server keeps the old sign-on until it restarts. Enrolling a second time used to write the file silently, which looked like nothing had happened.
+
 ## 0.2.7 - 2026-11-16
 (0.2.5 and 0.2.6 were test builds that never reached the Marketplace; everything below is new since 0.2.4.)
 - Find on screen (Juan Concepcion, #18): Ctrl+F (Cmd+F on macOS) opens a find bar at the top right of the terminal; every match on the current screen is highlighted and the current one selected, Enter / Shift+Enter (or F3 / Shift+F3) step through them, Alt+C toggles Match Case, Page Up / Page Down roll the host without leaving the box, Escape closes. Each new screen is searched again, so `CPF` follows a spool file page after page. Nondisplay fields are never matched. Also on the right-click menu and in the Command Palette (TN5250: Find on Screen); the key is in the Edit group of the Keyboard page.

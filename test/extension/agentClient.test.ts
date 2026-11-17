@@ -65,11 +65,15 @@ describe('agent client', () => {
       writeFileSync(join(dir, '20.json'), JSON.stringify({ pid: 20, addr: '127.0.0.1:2', token: 'b', started: '2026-11-14T11:00:00Z' }));
       writeFileSync(join(dir, 'junk.json'), '{');
       writeFileSync(join(dir, 'notes.txt'), 'x');
-      const list = listTokens(dir);
+      const list = listTokens(dir, () => true);
       expect(list.map((t) => t.pid)).toEqual([20, 10]);
       expect(list[1]?.label).toBe('old');
       expect(existsSync(join(dir, 'junk.json'))).toBe(false);
-      expect(listTokens(join(dir, 'missing'))).toEqual([]);
+      expect(listTokens(join(dir, 'missing'), () => true)).toEqual([]);
+      // A server whose process ended is dropped and its token file deleted.
+      expect(listTokens(dir, (pid) => pid !== 10).map((t) => t.pid)).toEqual([20]);
+      expect(existsSync(join(dir, '10.json'))).toBe(false);
+      expect(existsSync(join(dir, '20.json'))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

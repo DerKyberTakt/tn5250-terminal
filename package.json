@@ -331,6 +331,18 @@
         "title": "Watch in New Window",
         "category": "TN5250",
         "icon": "$(multiple-windows)"
+      },
+      {
+        "command": "tn5250.agent.forget",
+        "title": "Forget Agent Server",
+        "category": "TN5250",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "tn5250.agent.cleanUp",
+        "title": "Clean Up Agent Servers",
+        "category": "TN5250",
+        "icon": "$(clear-all)"
       }
     ],
     "menus": {
@@ -530,6 +542,11 @@
           "command": "tn5250.agent.enroll",
           "when": "view == tn5250.agents",
           "group": "navigation@3"
+        },
+        {
+          "command": "tn5250.agent.cleanUp",
+          "when": "view == tn5250.agents",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -547,6 +564,16 @@
           "command": "tn5250.agent.newWindow",
           "when": "view == tn5250.agents && viewItem == agent-session",
           "group": "inline@3"
+        },
+        {
+          "command": "tn5250.agent.forget",
+          "when": "view == tn5250.agents && viewItem == agent-server-dead",
+          "group": "inline@1"
+        },
+        {
+          "command": "tn5250.agent.forget",
+          "when": "view == tn5250.agents && viewItem =~ /^agent-server/",
+          "group": "1_more@1"
         },
         {
           "command": "tn5250.connectSession",
