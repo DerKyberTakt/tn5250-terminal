@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.2.8 - unreleased
+- Install tn5250-tui from inside VS Code: the AI Agent page's Install button (Update once a copy is there), the Agent Sessions view's welcome text and TN5250: Install tn5250-tui download the latest release for this platform from GitHub, check it against the release's SHA256SUMS, unpack it into the extension's own storage and use it from there; the binary setting can stay empty. The agent's MCP server is that binary, so the feature now works without a separate install step (before, the view pointed at a binary the user had to find and put on PATH).
 - Agent Sessions: the view's title says how many agent sessions are connected, a server with a connected session and the session itself carry the green session icon of the Sessions view (grey when disconnected), and servers with connected sessions sort first. Servers whose process has ended no longer linger in the list: their registration is dropped as soon as the view looks. A server that still runs but does not answer shows as such with a Forget button; Clean Up Agent Servers (view title) forgets all of them at once.
 - Enroll User for AI Agent on a site that is already enrolled now says so: the dialog names the current enrollment, asks to Replace it, and the message afterwards reports what the file holds (read back) and that a running agent server keeps the old sign-on until it restarts. Enrolling a second time used to write the file silently, which looked like nothing had happened.
 

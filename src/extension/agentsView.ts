@@ -1,6 +1,7 @@
 import { dirname } from 'node:path';
 import * as vscode from 'vscode';
 import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, removeSite, sitesPath, type AgentSession, type AgentToken } from './agentClient';
+import { installRelease, installedBinary, latestTag, tarExtract } from './agentInstall';
 import { findPassword } from './secretKeys';
 import { resolvedSessions } from './settingsStore';
 
@@ -183,14 +184,56 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     return this.servers;
   }
 
-  /** The binary, or a message telling the user how to get it. */
-  private binary(): string | undefined {
+  /** Where Install tn5250-tui puts the console terminal: a folder of this extension's own. */
+  installDir(): string {
+    return vscode.Uri.joinPath(this.context.globalStorageUri, 'tn5250-tui').fsPath;
+  }
+
+  /** The console terminal: the setting, the copy installed here, PATH, the installer's folder. */
+  findBinary(): string | undefined {
     const setting = vscode.workspace.getConfiguration('tn5250').get<string>('agent.binary', '');
-    const bin = findBinary(setting);
+    return findBinary(setting, undefined, undefined, undefined, [...(installedBinary(this.installDir(), process.platform) ? [dirname(installedBinary(this.installDir(), process.platform)!)] : [])]);
+  }
+
+  /**
+   * Install tn5250-tui: the latest release for this platform, from GitHub, checked against the
+   * release's SHA256SUMS, unpacked into the extension's storage. The binary is then found
+   * without any PATH work; the setting may stay empty.
+   */
+  async install(): Promise<string | undefined> {
+    const dir = this.installDir();
+    try {
+      return await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'TN5250: installing tn5250-tui' }, async (progress) => {
+        const deps = {
+          fetch: (url: string, init?: { redirect?: 'follow' | 'manual' }) => fetch(url, init),
+          extract: tarExtract,
+          platform: process.platform,
+          arch: process.arch,
+          report: (text: string) => progress.report({ message: text }),
+        };
+        progress.report({ message: 'Looking up the latest release…' });
+        const tag = await latestTag(deps);
+        const bin = await installRelease(dir, tag, deps);
+        void vscode.window.showInformationMessage(`TN5250: tn5250-tui ${tag} installed: ${bin}`);
+        this.refresh();
+        return bin;
+      });
+    } catch (e) {
+      void vscode.window.showErrorMessage(`TN5250: could not install tn5250-tui: ${(e as Error).message}`);
+      return undefined;
+    }
+  }
+
+  /** The binary, or an offer to install it. */
+  private binary(): string | undefined {
+    const bin = this.findBinary();
     if (!bin) {
       void vscode.window
-        .showWarningMessage('TN5250: tn5250-tui (the console terminal) was not found on PATH. Install it or set tn5250.agent.binary.', 'Open Settings')
-        .then((pick) => pick && vscode.commands.executeCommand('workbench.action.openSettings', 'tn5250.agent.binary'));
+        .showWarningMessage('TN5250: tn5250-tui (the console terminal) was not found. Install it here, or set tn5250.agent.binary.', 'Install tn5250-tui', 'Open Settings')
+        .then((pick) => {
+          if (pick === 'Install tn5250-tui') void this.install();
+          else if (pick) void vscode.commands.executeCommand('workbench.action.openSettings', 'tn5250.agent.binary');
+        });
     }
     return bin;
   }
@@ -355,7 +398,7 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
       return;
     }
     const cfg = vscode.workspace.getConfiguration('tn5250');
-    const bin = findBinary(cfg.get<string>('agent.binary', '')) ?? 'tn5250-tui';
+    const bin = this.findBinary() ?? 'tn5250-tui';
     const site = cfg.get<string>('agent.site', 'agent');
     const readOnly = cfg.get<boolean>('agent.readOnly', true);
     const target = vscode.Uri.joinPath(folder.uri, '.mcp.json');

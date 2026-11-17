@@ -343,6 +343,12 @@
         "title": "Clean Up Agent Servers",
         "category": "TN5250",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "tn5250.agent.install",
+        "title": "Install tn5250-tui (Console Terminal)",
+        "category": "TN5250",
+        "icon": "$(cloud-download)"
       }
     ],
     "menus": {
@@ -2141,7 +2147,7 @@
       },
       {
         "view": "tn5250.agents",
-        "contents": "No agent server is running.\nAn AI agent (Claude Code) drives 5250 sessions through tn5250-tui mcp, the console terminal's MCP server; its sessions appear here and each one can be watched in a terminal.\n[Set Up Claude Code](command:tn5250.agent.setup)\nWrites .mcp.json in the workspace.\n[Enroll User for AI Agent](command:tn5250.agent.enroll)\nLets the agent sign on with one of your connections and your user profile (bypass sign-on), when it cannot have a profile of its own."
+        "contents": "No agent server is running.\nAn AI agent (Claude Code) drives 5250 sessions through tn5250-tui mcp, the console terminal's MCP server; its sessions appear here and each one can be watched in a terminal.\n[Install tn5250-tui](command:tn5250.agent.install)\nDownloads the console terminal, the agent's server, from its GitHub release (checked against SHA256SUMS) into this extension's storage.\n[Set Up Claude Code](command:tn5250.agent.setup)\nWrites .mcp.json in the workspace.\n[Enroll User for AI Agent](command:tn5250.agent.enroll)\nLets the agent sign on with one of your connections and your user profile (bypass sign-on), when it cannot have a profile of its own."
       },
       {
         "view": "tn5250.macrosView",

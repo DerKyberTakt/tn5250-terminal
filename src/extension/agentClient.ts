@@ -190,7 +190,10 @@ export function listTokens(dir: string = tokenDir(), alive: (pid: number) => boo
   return out.sort((a, b) => b.started.localeCompare(a.started));
 }
 
-/** Where the console terminal's binary is: the setting, else PATH, else the installer's folders. */
+/**
+ * Where the console terminal's binary is: the setting, else the folders in extraDirs (the
+ * copy this extension installed), else PATH, else the installer's folders.
+ */
 export function findBinary(
   setting: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -203,10 +206,11 @@ export function findBinary(
       return false;
     }
   },
+  extraDirs: string[] = [],
 ): string | undefined {
   if (setting.trim()) return setting.trim();
   const name = platform === 'win32' ? 'tn5250-tui.exe' : 'tn5250-tui';
-  const dirs = (env.PATH ?? '').split(platform === 'win32' ? ';' : delimiter).filter(Boolean);
+  const dirs = [...extraDirs, ...(env.PATH ?? '').split(platform === 'win32' ? ';' : delimiter).filter(Boolean)];
   if (platform === 'win32') dirs.push(join(env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'Programs', 'tn5250-tui'));
   else dirs.push(join(homedir(), '.local', 'bin'), '/usr/local/bin', '/usr/bin');
   for (const d of dirs) {

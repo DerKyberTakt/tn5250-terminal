@@ -217,6 +217,7 @@ export function activate(context: vscode.ExtensionContext): void {
   register('tn5250.agent.newWindow', (item: AgentSessionItem) => agents.popOut(item, 'window'));
   register('tn5250.agent.forget', (item: AgentServerItem) => agents.forget(item));
   register('tn5250.agent.cleanUp', () => agents.cleanUp());
+  register('tn5250.agent.install', () => agents.install());
 
   // Macros: recorded in the active tab, run by key, from the Macros view or from the lists.
   macroStore.init(context);

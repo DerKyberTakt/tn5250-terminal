@@ -19,6 +19,8 @@ The agent never gets your password through the model: credentials live in the co
 
 ## 1. Install tn5250-tui
 
+The quickest way is from inside VS Code: on the TN5250 Settings page, **AI Agent**, press **Install…** next to the tn5250-tui path (or run **TN5250: Install tn5250-tui**, or click Install in the empty Agent Sessions view). The extension downloads the latest release for your platform from GitHub, checks it against the release's `SHA256SUMS`, unpacks it into its own storage and uses it from there. Nothing goes on PATH and the path setting stays empty; **Update…** fetches a newer release later. The ways below put `tn5250-tui` on PATH instead, for use from a shell too.
+
 Windows (PowerShell 5.1 or newer):
 
 ```powershell
@@ -117,7 +119,7 @@ From any terminal, `tn5250-tui attach --list` prints the running servers and the
 
 | What you see | What it means |
 |---|---|
-| The AI Agent page says tn5250-tui was not found | It is not on PATH. Open a new terminal after installing, or set `tn5250.agent.binary` with Browse. |
+| The AI Agent page says tn5250-tui was not found | Press Install… on that page, or put it on PATH (open a new terminal after installing), or set `tn5250.agent.binary` with Browse. |
 | Claude Code lists no `tn5250` server | `.mcp.json` is in another folder, or Claude Code was started before it was written: `/mcp` reconnects. |
 | `connect` fails with *no saved site "agent"* | The site is not in tn5250-tui's sites file: step 2. With `TN5250_TUI_CONFIG` set, the extension and tn5250-tui must both see it. |
 | `connect` says the password is not in the secret store any more | The OS secret store lost it (a new machine, a cleared Credential Manager). Enter it again in `:sites`, or re-enroll. |
