@@ -1173,6 +1173,11 @@
           "type": "boolean",
           "description": "TN5250: enhanced text glow. Set it on the TN5250 Settings page."
         },
+        "tn5250.enhanced.textWindows": {
+          "default": true,
+          "type": "boolean",
+          "description": "TN5250: enhanced frame text windows. Set it on the TN5250 Settings page."
+        },
         "tn5250.enhanced.glowColor": {
           "default": "#00d060",
           "type": "string",

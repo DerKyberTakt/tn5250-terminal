@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.9 - unreleased
+- Enhanced screen style: windows the host draws with border characters get the same rounded frame and shadow as GUI windows. IBM i sends a DDS WINDOW as plain text when its WDWBORDER names border characters or a display attribute (many vendor screens do), so such windows showed as bars of reverse-image characters while others got a frame. The border layout of a character display (attribute, border character, attribute on each side between a top and a bottom row) is recognised on every screen; a title or footer written over the border becomes the frame's label. New setting Frame text windows on the Enhanced UI page, on by default.
+
 ## 0.2.8 - 2026-11-16
 - Install tn5250-tui from inside VS Code: the AI Agent page's Install button (Update once a copy is there), the Agent Sessions view's welcome text and TN5250: Install tn5250-tui download the latest release for this platform from GitHub, check it against the release's SHA256SUMS, unpack it into the extension's own storage and use it from there; the binary setting can stay empty. The agent's MCP server is that binary, so the feature now works without a separate install step (before, the view pointed at a binary the user had to find and put on PATH).
 - Agent Sessions: the view's title says how many agent sessions are connected, a server with a connected session and the session itself carry the green session icon of the Sessions view (grey when disconnected), and servers with connected sessions sort first. Servers whose process has ended no longer linger in the list: their registration is dropped as soon as the view looks. A server that still runs but does not answer shows as such with a Forget button; Clean Up Agent Servers (view title) forgets all of them at once.
