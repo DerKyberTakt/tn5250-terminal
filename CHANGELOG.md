@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.2.9 - unreleased
+- SEU syntax colouring no longer colours a member it cannot place as if it were RPG (issue #3 on the desktop: a QSYSINC/H C header came up in RPG colours). The language now comes from the source file name, then from SEU's FMT line (an RPG spec letter or A for DDS), then from the code; when none of them answers, the screen stays in the host's colours. New: C and C++ colouring for QSYSINC headers (H, SYS, MIH, ...), QCSRC and QCPPSRC (comments, strings, keywords, calls, preprocessor lines), and QCMDSRC command definitions use the CL colours.
 - Enhanced screen style: windows the host draws with border characters get the same rounded frame and shadow as GUI windows. IBM i sends a DDS WINDOW as plain text when its WDWBORDER names border characters or a display attribute (many vendor screens do), so such windows showed as bars of reverse-image characters while others got a frame. The border layout of a character display (attribute, border character, attribute on each side between a top and a bottom row) is recognised on every screen; a title or footer written over the border becomes the frame's label. New setting Frame text windows on the Enhanced UI page, on by default.
 
 ## 0.2.8 - 2026-11-16
