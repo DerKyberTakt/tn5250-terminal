@@ -184,7 +184,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   register('tn5250.importKmp', () => importKmpInteractive(-1));
   register('tn5250.importConnections', async () => {
-    const outcome = await importConnectionsInteractive();
+    const outcome = await importConnectionsInteractive(context.secrets);
     if (!outcome) return;
     if (!outcome.imported) {
       void vscode.window.showInformationMessage(outcome.message);

@@ -4,6 +4,7 @@ import { importHod } from '../shared/hodImport';
 import { isSaved, mergeImported } from '../shared/sessionImport';
 import type { SessionOverrides } from '../shared/settings';
 import { acsEmulatorDir } from './kmpCommand';
+import { passwordKey } from './secretKeys';
 import { readDefaults, readSessions, resolvedSessions, writeSessions } from './settingsStore';
 
 /**
@@ -150,7 +151,7 @@ function detail(session: SessionOverrides, notes: string[]): string | undefined 
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-export async function importConnectionsInteractive(): Promise<ImportOutcome | undefined> {
+export async function importConnectionsInteractive(secrets?: vscode.SecretStorage): Promise<ImportOutcome | undefined> {
   // Only 5250 display sessions are ever offered, so the counts and messages speak of those
   // alone; printer, 3270 and VT profiles are left out without a word.
   const acsDir = acsEmulatorDir();
@@ -228,10 +229,23 @@ export async function importConnectionsInteractive(): Promise<ImportOutcome | un
     return { message: `TN5250: nothing imported: the ${plural(merged.skipped.length, 'selected connection')} ${merged.skipped.length === 1 ? 'is' : 'are'} already saved.`, imported: 0, firstIndex: -1, previous };
   }
   await writeSessions(merged.sessions);
+  // A stored password never follows a connection to another host, port or TLS setting:
+  // delete it unless another saved connection still signs on with the same user at the same host.
+  let passwordsDropped = 0;
+  for (const old of merged.credentialsReset) {
+    const user = (old.signonUser ?? '').trim();
+    if (!user || !secrets) continue;
+    const key = passwordKey(old.name ?? old.host, old.host, user);
+    if (merged.sessions.some((x) => passwordKey(x.name ?? x.host, x.host, x.signonUser ?? '') === key)) continue;
+    await secrets.delete(key);
+    passwordsDropped += 1;
+  }
+  const tlsNote = merged.tlsKept.length ? ` TLS stays on for ${plural(merged.tlsKept.length, 'saved connection')} whose profile said plain telnet.` : '';
+  const resetNote = merged.credentialsReset.length ? ` The sign-on user and bypass sign-on of ${plural(merged.credentialsReset.length, 'connection')} were cleared because host, port or TLS changed${passwordsDropped ? ' (the saved password was deleted)' : ''}; enter them again.` : '';
   const replaced = merged.replaced.length ? ` (${merged.replaced.length} updated)` : '';
   const skipped = merged.skipped.length ? ` ${plural(merged.skipped.length, 'saved connection')} left as ${merged.skipped.length === 1 ? 'it was' : 'they were'}.` : '';
   return {
-    message: `TN5250: ${plural(n, 'connection')} imported${replaced}.${skipped}${unreadableNote}`,
+    message: `TN5250: ${plural(n, 'connection')} imported${replaced}.${skipped}${tlsNote}${resetNote}${unreadableNote}`,
     imported: n,
     firstIndex: merged.touched[0] ?? -1,
     previous,
