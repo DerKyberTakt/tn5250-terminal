@@ -450,7 +450,7 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     }
     await vscode.workspace.fs.writeFile(target, Buffer.from(text, 'utf8'));
     void vscode.window.showInformationMessage(
-      `TN5250: ${target.fsPath} now starts tn5250-tui mcp for site "${site}"${readOnly ? ' (read-only)' : ''}. Add that site in tn5250-tui (:sites) with the agent's own user profile, then restart Claude Code in this folder.`,
+      `TN5250: ${target.fsPath} now starts tn5250-tui mcp for site "${site}"${readOnly ? ' (read-only)' : ''}; other arguments (such as --audit) and env of an existing entry were kept. Add that site in tn5250-tui (:sites) with the agent's own user profile, then restart Claude Code in this folder.`,
     );
     await vscode.window.showTextDocument(target);
   }

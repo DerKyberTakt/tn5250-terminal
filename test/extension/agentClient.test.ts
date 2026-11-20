@@ -180,3 +180,20 @@ describe('sitePasswordForm', () => {
     expect(sitePasswordForm('not json', 'agent')).toBe('none');
   });
 });
+
+describe('mergeMcpJson keeps what the user added to the tn5250 entry', () => {
+  it('keeps --audit, other args and env; changes only binary, --site and --read-only', () => {
+    const existing = JSON.stringify({
+      mcpServers: { tn5250: { command: 'old', args: ['mcp', '--site', 'x', '--read-only', '--audit', 'audit.jsonl'], env: { TN5250_TUI_SECRETS: 'file' }, type: 'stdio' } },
+    });
+    const out = JSON.parse(mergeMcpJson(existing, { binary: 'new', site: 'agent', readOnly: false })) as { mcpServers: { tn5250: Record<string, unknown> } };
+    expect(out.mcpServers.tn5250).toEqual({
+      command: 'new',
+      args: ['mcp', '--site', 'agent', '--audit', 'audit.jsonl'],
+      env: { TN5250_TUI_SECRETS: 'file' },
+      type: 'stdio',
+    });
+    const again = JSON.parse(mergeMcpJson(JSON.stringify(out), { binary: 'new', site: 'agent', readOnly: true })) as typeof out;
+    expect(again.mcpServers.tn5250.args).toEqual(['mcp', '--site', 'agent', '--read-only', '--audit', 'audit.jsonl']);
+  });
+});

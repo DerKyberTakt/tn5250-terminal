@@ -326,9 +326,27 @@ export function mergeMcpJson(existing: string | undefined, opts: { binary: strin
   if (existing && existing.trim()) {
     root = JSON.parse(existing) as typeof root;
   }
-  const args = ['mcp'];
+  const servers = root.mcpServers ?? {};
+  const prev = servers.tn5250;
+  const old = prev && typeof prev === 'object' && !Array.isArray(prev) ? (prev as Record<string, unknown>) : {};
+  // The command owns the binary, `mcp`, --site and --read-only; every other argument and
+  // every other key of an existing entry (env, --audit FILE, ...) is the user's and stays.
+  const kept: unknown[] = [];
+  const oldArgs: unknown[] = Array.isArray(old.args) ? old.args : [];
+  for (let i = 0; i < oldArgs.length; i++) {
+    const a = oldArgs[i];
+    if (a === 'mcp' && i === 0) continue;
+    if (a === '--site' || a === '-site') {
+      i += 1; // its value
+      continue;
+    }
+    if (typeof a === 'string' && (/^--?site=/.test(a) || a === '--read-only' || a === '-read-only' || /^--?read-only=/.test(a))) continue;
+    kept.push(a);
+  }
+  const args: unknown[] = ['mcp'];
   if (opts.site.trim()) args.push('--site', opts.site.trim());
   if (opts.readOnly) args.push('--read-only');
-  root.mcpServers = { ...(root.mcpServers ?? {}), tn5250: { command: opts.binary, args } };
+  args.push(...kept);
+  root.mcpServers = { ...servers, tn5250: { ...old, command: opts.binary, args } };
   return JSON.stringify(root, null, 2) + '\n';
 }
