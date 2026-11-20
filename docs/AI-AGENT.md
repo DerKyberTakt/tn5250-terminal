@@ -70,7 +70,7 @@ Open the TN5250 Settings page (the gear in the TN5250 side bar, or **TN5250: Ope
 | **Agent Sessions view** (`tn5250.agent.enabled`) | Shows the Agent Sessions view in the TN5250 side bar. Off by default. |
 | **tn5250-tui** (`tn5250.agent.binary`) | Path of the console terminal. Empty = found on PATH or in the installer's folder; Browse picks one. The page says which one was found. |
 | **Site** (`tn5250.agent.site`) | The site the agent signs on with; `agent` by default. The page says who is enrolled under that name. |
-| **Read-only server** (`tn5250.agent.readOnly`) | Starts the server with `--read-only`: typed text that starts a command that changes things (`DLT*`, `CLR*`, `CHG*`, `CRT*`, `RMV*`, `UPD*`, `SBMJOB`, `CALL`, `RUNSQL`, ...) is refused. On by default; turn it off only for an agent that is meant to change things. |
+| **Read-only server** (`tn5250.agent.readOnly`) | Starts the server with `--read-only`: typed text that starts a command that changes things (`DLT*`, `CLR*`, `CHG*`, `CRT*`, `RMV*`, `UPD*`, `SBMJOB`, `CALL`, `RUNSQL`, ...) is refused. It is not a fence: it does not see what a menu option or a program does, so the agent profile's authority on the host is the real limit. On by default; turn it off only for an agent that is meant to change things. |
 
 These are application-wide settings with their own **Save** button on that page.
 
