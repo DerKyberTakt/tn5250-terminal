@@ -1,9 +1,9 @@
-import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, rmSync, statSync, chmodSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, mcpHasServer, mergeMcpJson, removeSite, sitesPath, tokenDir } from '../../src/extension/agentClient';
+import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, mcpHasServer, mergeMcpJson, removeSite, sitesPath, tokenDir, writePrivateFile } from '../../src/extension/agentClient';
 
 /** A fake `tn5250-tui mcp` viewer listener: hello with the token, then list. */
 function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
@@ -147,5 +147,24 @@ describe('AI Agent page status helpers', () => {
     expect(mcpHasServer('{"mcpServers":{"other":{}}}')).toBe(false);
     expect(mcpHasServer(mergeMcpJson(undefined, { binary: 'tn5250-tui', site: 'agent', readOnly: true }))).toBe(true);
     expect(mcpHasServer('nope')).toBe(false);
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('writePrivateFile', () => {
+  it('creates the directory 0700 and the file 0600, and tightens an existing 0644 file', () => {
+    const root = mkdtempSync(join(tmpdir(), 'tn5250-priv-'));
+    try {
+      const file = join(root, 'cfg', 'sites.json');
+      writePrivateFile(file, '{"a":1}\n');
+      expect(statSync(join(root, 'cfg')).mode & 0o777).toBe(0o700);
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+      chmodSync(file, 0o644);
+      writePrivateFile(file, '{"a":2}\n');
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+      expect(readFileSync(file, 'utf8')).toBe('{"a":2}\n');
+      expect(readdirSync(join(root, 'cfg'))).toEqual(['sites.json']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

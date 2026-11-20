@@ -7,7 +7,7 @@
  * and speaks JSON lines on 127.0.0.1:<port>: a hello with the token, then `list`
  * requests answered with `sessions`.
  */
-import { readdirSync, readFileSync, statSync, unlinkSync, accessSync, constants } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, accessSync, constants } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { Socket, createConnection } from 'node:net';
@@ -55,6 +55,30 @@ export function tokenDir(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.
 export function sitesPath(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string {
   if (env.TN5250_TUI_CONFIG) return env.TN5250_TUI_CONFIG;
   return join(dirname(tokenDir(env, platform)), 'sites.json');
+}
+
+/**
+ * Writes a file that may hold a clear-text password: directory 0700 (when it has to be
+ * created), file 0600, written to a temp file beside it and renamed over the target, so
+ * the secret is never in a file with default modes. An existing file is chmod'ed too.
+ * Modes are a no-op on Windows (the profile's ACLs apply).
+ */
+export function writePrivateFile(path: string, text: string, platform: NodeJS.Platform = process.platform): void {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmp, text, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    if (platform !== 'win32') chmodSync(tmp, 0o600);
+    renameSync(tmp, path);
+  } catch (e) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      /* no temp file to remove */
+    }
+    throw e;
+  }
+  if (platform !== 'win32') chmodSync(path, 0o600);
 }
 
 /** A site as the console terminal stores it; the password is clear text by its design. */

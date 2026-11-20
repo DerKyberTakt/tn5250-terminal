@@ -1,6 +1,6 @@
 import { dirname } from 'node:path';
 import * as vscode from 'vscode';
-import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, removeSite, sitesPath, type AgentSession, type AgentToken } from './agentClient';
+import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, removeSite, sitesPath, writePrivateFile, type AgentSession, type AgentToken } from './agentClient';
 import { installRelease, installedBinary, latestTag, tarExtract } from './agentInstall';
 import { findPassword } from './secretKeys';
 import { resolvedSessions } from './settingsStore';
@@ -349,8 +349,12 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
       void vscode.window.showErrorMessage(`TN5250: ${path} is not valid JSON (${(e as Error).message}); fix it or remove it first.`);
       return;
     }
-    await vscode.workspace.fs.createDirectory(vscode.Uri.file(dirname(path)));
-    await vscode.workspace.fs.writeFile(target, Buffer.from(text, 'utf8'));
+    try {
+      writePrivateFile(path, text);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`TN5250: could not write ${path}: ${(e as Error).message}`);
+      return;
+    }
     // Read it back: the message reports what the file holds, not what was meant to be written.
     const now = enrolledUser(Buffer.from(await vscode.workspace.fs.readFile(target)).toString('utf8'), siteName);
     if (now.toUpperCase() !== `${user}@${session.host}`.toUpperCase()) {
@@ -386,7 +390,12 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
       void vscode.window.showInformationMessage(`TN5250: no site "${siteName}" in ${path}; nothing to remove.`);
       return;
     }
-    await vscode.workspace.fs.writeFile(target, Buffer.from(text, 'utf8'));
+    try {
+      writePrivateFile(path, text);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`TN5250: could not write ${path}: ${(e as Error).message}`);
+      return;
+    }
     void vscode.window.showInformationMessage(`TN5250: site "${siteName}" removed from ${path}. A running agent server keeps its open sessions until it exits.`);
   }
 
