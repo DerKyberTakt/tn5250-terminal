@@ -647,6 +647,7 @@
       "title": "TN5250 Terminal",
       "properties": {
         "tn5250.debug.keyOverlay": {
+          "scope": "application",
           "type": "boolean",
           "default": false,
           "description": "Show the last key events in the terminal tab (used to verify keyboard capture)."
@@ -962,6 +963,7 @@
           "description": "TN5250: watermark text. Set it on the TN5250 Settings page."
         },
         "tn5250.watermark.image": {
+          "scope": "application",
           "default": "",
           "type": "string",
           "description": "TN5250: watermark image. Set it on the TN5250 Settings page."
@@ -1426,6 +1428,7 @@
           "description": "Path of the PEM private key (PEM mode only)."
         },
         "tn5250.font.file": {
+          "scope": "application",
           "type": "string",
           "default": "",
           "description": "Font file imported through Settings > Font."

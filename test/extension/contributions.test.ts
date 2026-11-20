@@ -62,3 +62,15 @@ describe('package.json contributions', () => {
     for (const cmd of ['tn5250.runMacroItem', 'tn5250.editMacroItem', 'tn5250.deleteMacroItem']) expect(hidden.has(cmd), cmd).toBe(true);
   });
 });
+
+describe('setting scopes', () => {
+  const cfg = (pkg.contributes as unknown as { configuration: { properties: Record<string, { scope?: string }> } | Array<{ properties: Record<string, { scope?: string }> }> }).configuration;
+  const props = Object.assign({}, ...(Array.isArray(cfg) ? cfg : [cfg]).map((x) => x.properties)) as Record<string, { scope?: string }>;
+
+  it('settings that leak keys, name hosts or files, or change trust are application-scoped (a workspace cannot set them)', () => {
+    const risky = /^tn5250\.(connection\.|agent\.|sessions$|behavior\.pcCommands|debug\.|font\.file|watermark\.image)/;
+    const keys = Object.keys(props).filter((k) => risky.test(k));
+    expect(keys.length).toBeGreaterThan(20);
+    for (const k of keys) expect(props[k]?.scope, k).toBe('application');
+  });
+});
