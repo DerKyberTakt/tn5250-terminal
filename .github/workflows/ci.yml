@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, next]
   pull_request:
 
 jobs:
@@ -15,9 +15,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run check
-      - run: node esbuild.mjs --production
-      - run: npx @vscode/vsce package --no-dependencies -o tn5250-terminal.vsix
+      # check, a clean production build, the VSIX file-list check, then vsce package (the project's own recipe).
+      - run: npm run package -- -o tn5250-terminal.vsix
       - uses: actions/upload-artifact@v5
         with:
           name: tn5250-terminal.vsix
