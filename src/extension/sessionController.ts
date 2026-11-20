@@ -5,6 +5,7 @@ import { Session5250 } from '../engine/session';
 import { variantChars } from '../engine/variant';
 import type { KeyAction } from '../shared/keymap';
 import { friendlyNetError } from '../shared/netErrors';
+import { cursorInHiddenField } from '../shared/macros';
 import { isSignonScreen } from '../shared/screenText';
 import { SignonGate, signonGate } from '../shared/signonGate';
 import { classifyPcCommand, decidePcCommand, type PcCommandDecision, type PcCommandKind, type PcCommandPolicy } from '../shared/pcCommand';
@@ -376,6 +377,11 @@ export class SessionController {
     const codePage = this.session.codePage.ccsid;
     this.events.log(`sign-on failed and the password has characters that differ between code pages (${pending.chars.join(' ')}); this session uses code page ${codePage}: check Host Code Page against the host's CCSID (README > Troubleshooting)`);
     this.events.signonHint?.({ codePage, chars: pending.chars, paused: !!pending.gate });
+  }
+
+  /** Whether the cursor is in a non-display (password) field; what is typed there must not be recorded. */
+  get cursorHidden(): boolean {
+    return cursorInHiddenField(this.session.screen);
   }
 
   type(text: string): void {
