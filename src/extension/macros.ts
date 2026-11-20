@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { EDITOR_ACTIONS, MacroRecorder, actionName, describeStep, macroProblems, macrosFromJson, macrosToJson, mergeMacros, newMacroId, runMacro, sanitizeMacro, type Macro, type MacroStep, type MacroTarget } from '../shared/macros';
+import { EDITOR_ACTIONS, MacroRecorder, actionName, describeStep, macroKeyProblem, macroProblems, macrosFromJson, macrosToJson, mergeMacros, newMacroId, runMacro, sanitizeMacro, type Macro, type MacroStep, type MacroTarget } from '../shared/macros';
 import type { KeyAction } from '../shared/keymap';
 
 /**
@@ -118,15 +118,11 @@ export function runMacroKey(key: string, session: MacroSession, output: vscode.O
   return true;
 }
 
-const KEY_RULE = /^(?:(?:Ctrl|Alt|Meta|Shift)\+)*(?:F\d{1,2}|[^\s+]+)$/;
-
 function validateKey(value: string, others: Macro[], self: Macro): string | undefined {
   const key = value.trim();
   if (!key) return undefined;
-  if (!KEY_RULE.test(key)) return 'Modifiers then the key, as "Ctrl+Alt+1", "Alt+F5" or "F24".';
-  if (!/^(?:Ctrl|Alt|Meta)\+/.test(key) && !/^(?:Shift\+)?F\d{1,2}$/.test(key)) return 'Use a function key, or a combination with Ctrl, Alt or Meta, so typing is not affected.';
-  // A character key carries its shift state in the character: Shift+1 arrives as "!".
-  if (/Shift\+[^+]$/.test(key)) return 'With Shift, name the character the key produces instead: "Ctrl+!" for Ctrl+Shift+1.';
+  const problem = macroKeyProblem(key);
+  if (problem) return problem;
   const taken = others.find((o) => o.id !== self.id && o.key === key);
   return taken ? `${key} already runs "${taken.name}".` : undefined;
 }
@@ -316,18 +312,41 @@ export async function exportMacros(): Promise<void> {
   void vscode.window.showInformationMessage(`TN5250: ${macros.length} macro${macros.length === 1 ? '' : 's'} exported to ${target.fsPath}.`);
 }
 
+/** A name from a file somebody else wrote, on one line and without control or bidi-override characters. */
+const cleanName = (t: string): string =>
+  Array.from(t.slice(0, 120), (c) => {
+    const n = c.charCodeAt(0);
+    return n < 0x20 || (n >= 0x7f && n <= 0x9f) || n === 0x200e || n === 0x200f || (n >= 0x202a && n <= 0x202e) || (n >= 0x2066 && n <= 0x2069) ? ' ' : c;
+  }).join('');
+
 /** Reads a macros .json file: the same id replaces, a key another macro has is dropped. */
 export async function importMacros(): Promise<void> {
   const picked = await vscode.window.showOpenDialog({ title: 'Import macros', filters: MACRO_FILE_FILTER, canSelectMany: false });
   const file = picked?.[0];
   if (!file) return;
   const text = new TextDecoder().decode(await vscode.workspace.fs.readFile(file));
-  const incoming = macrosFromJson(text);
+  const refused: string[] = [];
+  const incoming = macrosFromJson(text, refused);
   if (!incoming) {
     void vscode.window.showWarningMessage('TN5250: that file is not a macros export.');
     return;
   }
-  const r = mergeMacros(macroStore.list(), incoming);
+  // Nothing is stored before the user has seen what comes in: every name, key and what it
+  // does, and which saved macros (same id) it replaces.
+  const saved = macroStore.list();
+  const lines = incoming.map((m) => {
+    const replaces = saved.find((o) => o.id === m.id);
+    const steps = m.steps.slice(0, 3).map(describeStep).join('; ') + (m.steps.length > 3 ? '; ...' : '');
+    return `${replaces ? 'REPLACES "' + replaces.name + '" with' : 'adds'} "${cleanName(m.name)}"${m.key ? ` on ${m.key}` : ''}: ${m.steps.length} step${m.steps.length === 1 ? '' : 's'} (${cleanName(steps)})`;
+  });
+  const refusedNote = refused.length ? `\n\nKeys refused (they would shadow ordinary keys), the macros come in without a key: ${refused.map(cleanName).join(', ')}.` : '';
+  const ok = await vscode.window.showWarningMessage(
+    `Import ${incoming.length} macro${incoming.length === 1 ? '' : 's'}?`,
+    { modal: true, detail: lines.slice(0, 15).join('\n') + (lines.length > 15 ? `\n... and ${lines.length - 15} more` : '') + refusedNote },
+    'Import',
+  );
+  if (ok !== 'Import') return;
+  const r = mergeMacros(saved, incoming);
   await macroStore.replaceAll(r.macros);
   const dropped = r.keysDropped.length ? ` The key of ${r.keysDropped.join(', ')} was already taken and was left off.` : '';
   void vscode.window.showInformationMessage(`TN5250: ${r.added} macro${r.added === 1 ? '' : 's'} added, ${r.replaced} replaced.${dropped}`);
