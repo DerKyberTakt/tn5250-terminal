@@ -215,6 +215,9 @@ export function activate(context: vscode.ExtensionContext): void {
   register('tn5250.agent.watch', (item: AgentSessionItem) => agents.watch(item));
   register('tn5250.agent.popOut', (item: AgentSessionItem) => agents.popOut(item, 'editor'));
   register('tn5250.agent.newWindow', (item: AgentSessionItem) => agents.popOut(item, 'window'));
+  register('tn5250.agent.endSession', (item: AgentSessionItem) => agents.end(item));
+  register('tn5250.agent.endAll', () => agents.endAll());
+  register('tn5250.agent.watchNext', () => agents.watchNext());
   register('tn5250.agent.forget', (item: AgentServerItem) => agents.forget(item));
   register('tn5250.agent.cleanUp', () => agents.cleanUp());
   register('tn5250.agent.install', () => agents.install());

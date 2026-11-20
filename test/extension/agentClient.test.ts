@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, mcpHasServer, mergeMcpJson, removeSite, sitePasswordForm, sitesPath, tokenDir, writePrivateFile } from '../../src/extension/agentClient';
+import { attachArgs, endSession, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, newlyConnected, sessionKey, mcpHasServer, mergeMcpJson, removeSite, sitePasswordForm, sitesPath, tokenDir, writePrivateFile } from '../../src/extension/agentClient';
 
 /** A fake `tn5250-tui mcp` viewer listener: hello with the token, then list. */
 function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
@@ -16,7 +16,7 @@ function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
         buf += chunk;
         let nl: number;
         while ((nl = buf.indexOf('\n')) >= 0) {
-          const m = JSON.parse(buf.slice(0, nl)) as { t: string; token?: string };
+          const m = JSON.parse(buf.slice(0, nl)) as { t: string; token?: string; session?: string; signoff?: boolean };
           buf = buf.slice(nl + 1);
           if (m.t === 'hello') {
             if (m.token !== token) {
@@ -28,6 +28,10 @@ function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
             sock.write(JSON.stringify({ t: 'sessions', sessions: [{ session: 's1', host: 'PUB400.COM', device: 'QPADEV0001', connected: true, seq: 7, inhibited: 'none' }] }) + '\n');
           } else if (m.t === 'list' && ok) {
             sock.write(JSON.stringify({ t: 'sessions', sessions: [] }) + '\n');
+          } else if (m.t === 'end' && ok) {
+            if (m.session === 'old') sock.write(JSON.stringify({ t: 'error', text: 'unknown request end' }) + '\n');
+            else if (m.session !== 's1') sock.write(JSON.stringify({ t: 'error', text: `no session "${m.session}"` }) + '\n');
+            else sock.write(JSON.stringify({ t: 'ended', session: m.session, signoff: m.signoff === true }) + '\n');
           } else if (m.t === 'bye') {
             sock.end();
           }
@@ -51,6 +55,26 @@ describe('agent client', () => {
   it('fetches the session list with the token', async () => {
     const sessions = await fetchSessions({ addr: srv.addr, token: 'tok' });
     expect(sessions).toEqual([{ session: 's1', host: 'PUB400.COM', device: 'QPADEV0001', connected: true, seq: 7, inhibited: 'none' }]);
+  });
+
+  it('ends a session: signed off when asked, a clear error from an older server or for an unknown session', async () => {
+    await expect(endSession({ addr: srv.addr, token: 'tok' }, 's1')).resolves.toBe(true);
+    await expect(endSession({ addr: srv.addr, token: 'tok' }, 's1', false)).resolves.toBe(false);
+    await expect(endSession({ addr: srv.addr, token: 'tok' }, 'old')).rejects.toThrow(/0\.2\.1 or later/);
+    await expect(endSession({ addr: srv.addr, token: 'tok' }, 's9')).rejects.toThrow(/no session/);
+    await expect(endSession({ addr: srv.addr, token: 'nope' }, 's1')).rejects.toThrow(/bad token/);
+  });
+
+  it('knows which sessions are new: nothing on the first look, then only those that connected since', () => {
+    const a = sessionKey('127.0.0.1:1', 's1');
+    const b = sessionKey('127.0.0.1:1', 's2');
+    const c = sessionKey('127.0.0.1:2', 's1');
+    expect(a).not.toBe(c);
+    expect(newlyConnected(undefined, new Set([a, b]))).toEqual([]);
+    expect(newlyConnected(new Set([a]), new Set([a, b, c]))).toEqual([b, c]);
+    expect(newlyConnected(new Set([a, b]), new Set([a]))).toEqual([]);
+    // a session that ended and a new one with the same handle on the same server is new again
+    expect(newlyConnected(new Set(), new Set([a]))).toEqual([a]);
   });
 
   it('rejects a wrong token and a dead server', async () => {

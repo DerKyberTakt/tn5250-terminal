@@ -1,6 +1,6 @@
 import { dirname } from 'node:path';
 import * as vscode from 'vscode';
-import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, removeSite, sitePasswordForm, sitesPath, writePrivateFile, type AgentSession, type AgentToken } from './agentClient';
+import { attachArgs, endSession, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, newlyConnected, removeSite, sessionKey, sitePasswordForm, sitesPath, writePrivateFile, type AgentSession, type AgentToken, type OpenViewer } from './agentClient';
 import { installRelease, installedBinary, latestTag, tarExtract } from './agentInstall';
 import { findPassword } from './secretKeys';
 import { resolvedSessions } from './settingsStore';
@@ -69,8 +69,15 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
   readonly onDidChangeTreeData = this.changed.event;
   private view: vscode.TreeView<AgentNode> | undefined;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private period = 0;
   private servers: AgentServerItem[] = [];
   private readonly terminals = new Map<string, vscode.Terminal>();
+  /** Connected sessions at the last poll; undefined before the first one. */
+  private seen: Set<string> | undefined;
+  /** Watch Next Agent Session: the next session that connects opens in the editor area, once. */
+  private watchNextArmed = false;
+  /** Viewers whose session ended, waiting a moment before they close. */
+  private readonly closing = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly icons: AgentIcons;
 
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -91,6 +98,12 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     return vscode.workspace.getConfiguration('tn5250').get<boolean>('agent.enabled', false);
   }
 
+  /** What happens when an agent session starts. */
+  static get openViewer(): OpenViewer {
+    const v = vscode.workspace.getConfiguration('tn5250').get<string>('agent.openViewer', 'off');
+    return v === 'panel' || v === 'editor' || v === 'window' ? v : 'off';
+  }
+
   attach(view: vscode.TreeView<AgentNode>): void {
     this.view = view;
     this.context.subscriptions.push(view.onDidChangeVisibility(() => this.schedule()));
@@ -100,9 +113,15 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
   /** Starts or stops the poll by visibility and the setting. */
   private schedule(): void {
     void vscode.commands.executeCommand('setContext', 'tn5250.agent.enabled', AgentsProvider.enabled);
-    const want = AgentsProvider.enabled && (this.view?.visible ?? false);
-    if (want && !this.timer) {
-      this.timer = setInterval(() => void this.poll(), 3000);
+    // A viewer that opens by itself needs the poll also while the view is hidden, and a short
+    // period: a ten-second agent run is over before a three-second poll shows it.
+    const auto = AgentsProvider.openViewer !== 'off' || this.watchNextArmed;
+    const want = AgentsProvider.enabled && ((this.view?.visible ?? false) || auto);
+    const period = auto ? 700 : 3000;
+    if (want && (!this.timer || this.period !== period)) {
+      this.stop();
+      this.period = period;
+      this.timer = setInterval(() => void this.poll(), period);
       void this.poll();
     } else if (!want) {
       this.stop();
@@ -116,6 +135,7 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
   private stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    this.period = 0;
   }
 
   /**
@@ -140,6 +160,7 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     const after = JSON.stringify(servers.map((s) => [s.id, s.description, s.sessions?.map((x) => [x.session, x.connected, x.inhibited])]));
     this.servers = servers;
     if (before !== after) this.changed.fire(undefined);
+    this.followSessions(servers);
     const n = servers.reduce((sum, s) => sum + s.connected, 0);
     if (this.view) {
       this.view.badge = n ? { value: n, tooltip: `${n} agent session${n === 1 ? '' : 's'} connected` } : undefined;
@@ -154,6 +175,95 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
               : 'not answering'
             : 'no server running';
     }
+  }
+
+  /**
+   * Opens a viewer for a session that just connected (the setting, or Watch Next Agent
+   * Session), and closes the viewer of a session that ended a few seconds after it did, so a
+   * viewer never sits on a dead session and the next one is not shown in an old viewer.
+   */
+  private followSessions(servers: AgentServerItem[]): void {
+    const now = new Map<string, AgentSessionItem>();
+    for (const srv of servers) {
+      for (const s of srv.sessions ?? []) {
+        if (s.connected) now.set(sessionKey(srv.token.addr, s.session), new AgentSessionItem(srv.token, s, this.icons));
+      }
+    }
+    const keys = new Set(now.keys());
+    const fresh = newlyConnected(this.seen, keys);
+    this.seen = keys;
+    for (const k of fresh) {
+      const item = now.get(k);
+      if (!item) continue;
+      const how: OpenViewer = this.watchNextArmed ? 'editor' : AgentsProvider.openViewer;
+      if (this.watchNextArmed) {
+        this.watchNextArmed = false;
+        this.schedule();
+      }
+      if (how !== 'off') void this.open(item, how, true);
+    }
+    for (const [k, term] of this.terminals) {
+      if (keys.has(k)) {
+        const t = this.closing.get(k);
+        if (t) {
+          clearTimeout(t);
+          this.closing.delete(k);
+        }
+      } else if (!this.closing.has(k)) {
+        this.closing.set(
+          k,
+          setTimeout(() => {
+            this.closing.delete(k);
+            this.terminals.delete(k);
+            term.dispose();
+          }, 4000),
+        );
+      }
+    }
+  }
+
+  /** Watch Next Agent Session: arms the view so the next session that connects opens in the editor area. */
+  watchNext(): void {
+    this.watchNextArmed = true;
+    this.schedule();
+    void vscode.window.showInformationMessage('TN5250: the next agent session opens in the editor area as soon as it connects.');
+  }
+
+  /** Sign Off and Close: asks the session's server to type SIGNOFF (when a command line is there) and close the session. */
+  async end(item: AgentSessionItem): Promise<void> {
+    try {
+      const signedOff = await endSession(item.token, item.session.session);
+      void vscode.window.showInformationMessage(`TN5250: agent session ${item.session.session} on ${item.session.host} ${signedOff ? 'signed off and closed' : 'closed (no command line on its screen to sign off at)'}.`);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`TN5250: could not end ${item.session.session}: ${(e as Error).message}`);
+    }
+    void this.poll();
+  }
+
+  /** Sign Off and Close All: every connected agent session of every server, after one confirmation. */
+  async endAll(): Promise<void> {
+    const all: AgentSessionItem[] = [];
+    for (const srv of this.servers) for (const s of srv.sessions ?? []) if (s.connected) all.push(new AgentSessionItem(srv.token, s, this.icons));
+    if (!all.length) {
+      void vscode.window.showInformationMessage('TN5250: no agent session is connected.');
+      return;
+    }
+    const pick = await vscode.window.showWarningMessage(
+      `TN5250: sign off and close ${all.length} agent session${all.length === 1 ? '' : 's'}? An agent that is working loses its session.`,
+      { modal: true },
+      'Sign Off and Close',
+    );
+    if (pick !== 'Sign Off and Close') return;
+    let failed = 0;
+    for (const item of all) {
+      try {
+        await endSession(item.token, item.session.session);
+      } catch {
+        failed++;
+      }
+    }
+    void vscode.window.showInformationMessage(`TN5250: ${all.length - failed} agent session${all.length - failed === 1 ? '' : 's'} ended${failed ? `, ${failed} could not be ended (older tn5250-tui?)` : ''}.`);
+    void this.poll();
   }
 
   /** Forget: removes one server's token file; it comes back only if that server registers again. */
@@ -238,10 +348,16 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
     return bin;
   }
 
-  /** Opens (or shows) the terminal that watches one session. */
-  watch(item: AgentSessionItem): vscode.Terminal | undefined {
-    const key = `${item.token.addr}/${item.session.session}`;
+  /**
+   * Opens (or shows) the viewer of one session where asked. A new viewer is created in its
+   * place (the terminal panel, or beside the active editor): nothing is moved, so the layout
+   * the user arranged stays. keepFocus leaves the focus where it is (a viewer that opened by
+   * itself must not take the keyboard).
+   */
+  async open(item: AgentSessionItem, where: Exclude<OpenViewer, 'off'>, keepFocus = false): Promise<vscode.Terminal | undefined> {
+    const key = sessionKey(item.token.addr, item.session.session);
     let term = this.terminals.get(key);
+    const created = !term;
     if (!term) {
       const bin = this.binary();
       if (!bin) return undefined;
@@ -251,19 +367,28 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
         shellArgs: attachArgs(item.token, item.session.session),
         iconPath: new vscode.ThemeIcon('eye'),
         isTransient: true,
+        location: where === 'panel' ? vscode.TerminalLocation.Panel : { viewColumn: vscode.ViewColumn.Beside, preserveFocus: keepFocus },
       });
       this.terminals.set(key, term);
     }
-    term.show(false);
+    if (where === 'window') {
+      // Moving into a window acts on the active terminal.
+      term.show(false);
+      await vscode.commands.executeCommand('workbench.action.terminal.moveIntoNewWindow');
+    } else if (!created || where === 'panel') {
+      term.show(keepFocus);
+    }
     return term;
   }
 
-  /** Watches the session in a terminal moved into the editor area (a tab you can drag out). */
+  /** Opens (or shows) the terminal that watches one session, in the terminal panel. */
+  watch(item: AgentSessionItem): Promise<vscode.Terminal | undefined> {
+    return this.open(item, 'panel');
+  }
+
+  /** Watches the session in the editor area (a tab you can drag out) or in a window of its own. */
   async popOut(item: AgentSessionItem, where: 'editor' | 'window'): Promise<void> {
-    const term = this.watch(item);
-    if (!term) return;
-    // The move commands act on the active terminal; show() made it so.
-    await vscode.commands.executeCommand(where === 'editor' ? 'workbench.action.terminal.moveToEditor' : 'workbench.action.terminal.moveIntoNewWindow');
+    await this.open(item, where);
   }
 
   /**

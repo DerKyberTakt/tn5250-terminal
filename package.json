@@ -333,6 +333,24 @@
         "icon": "$(multiple-windows)"
       },
       {
+        "command": "tn5250.agent.endSession",
+        "title": "Sign Off and Close Agent Session",
+        "category": "TN5250",
+        "icon": "$(sign-out)"
+      },
+      {
+        "command": "tn5250.agent.endAll",
+        "title": "Sign Off and Close All Agent Sessions",
+        "category": "TN5250",
+        "icon": "$(close-all)"
+      },
+      {
+        "command": "tn5250.agent.watchNext",
+        "title": "Watch Next Agent Session",
+        "category": "TN5250",
+        "icon": "$(eye-watch)"
+      },
+      {
         "command": "tn5250.agent.forget",
         "title": "Forget Agent Server",
         "category": "TN5250",
@@ -456,6 +474,10 @@
         {
           "command": "tn5250.deleteMacroItem",
           "when": "false"
+        },
+        {
+          "command": "tn5250.agent.endSession",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -553,6 +575,16 @@
           "command": "tn5250.agent.cleanUp",
           "when": "view == tn5250.agents",
           "group": "navigation@4"
+        },
+        {
+          "command": "tn5250.agent.watchNext",
+          "when": "view == tn5250.agents",
+          "group": "navigation@5"
+        },
+        {
+          "command": "tn5250.agent.endAll",
+          "when": "view == tn5250.agents",
+          "group": "navigation@6"
         }
       ],
       "view/item/context": [
@@ -570,6 +602,11 @@
           "command": "tn5250.agent.newWindow",
           "when": "view == tn5250.agents && viewItem == agent-session",
           "group": "inline@3"
+        },
+        {
+          "command": "tn5250.agent.endSession",
+          "when": "view == tn5250.agents && viewItem == agent-session",
+          "group": "inline@4"
         },
         {
           "command": "tn5250.agent.forget",
@@ -1488,6 +1525,24 @@
           "type": "boolean",
           "default": true,
           "description": "Start the agent's server with --read-only: typed text that starts a command that changes things (DLT, CHG, CRT, SBMJOB, CALL, ...) is refused. Set it on the TN5250 Settings page (AI Agent)."
+        },
+        "tn5250.agent.openViewer": {
+          "scope": "application",
+          "type": "string",
+          "enum": [
+            "off",
+            "panel",
+            "editor",
+            "window"
+          ],
+          "enumDescriptions": [
+            "Nothing opens by itself; click a session in the Agent Sessions view to watch it.",
+            "A viewer opens in the terminal panel when an agent session connects.",
+            "A viewer opens beside the active editor when an agent session connects.",
+            "A viewer opens in a window of its own when an agent session connects."
+          ],
+          "default": "off",
+          "description": "TN5250: what happens when an AI agent's 5250 session connects. A viewer that opens by itself does not take the keyboard focus, and it closes a few seconds after its session ended."
         }
       }
     },

@@ -37,6 +37,22 @@ interface WireMsg {
   session?: string;
   sessions?: AgentSession[];
   text?: string;
+  signoff?: boolean;
+}
+
+/** When a viewer opens by itself for a new agent session. */
+export type OpenViewer = 'off' | 'panel' | 'editor' | 'window';
+
+/** The key of one agent session across servers. */
+export const sessionKey = (addr: string, session: string): string => `${addr}/${session}`;
+
+/**
+ * The sessions that became connected since the last look. The first look (prev undefined)
+ * reports nothing: sessions that were already there when the view started are not "new".
+ */
+export function newlyConnected(prev: ReadonlySet<string> | undefined, now: ReadonlySet<string>): string[] {
+  if (!prev) return [];
+  return [...now].filter((k) => !prev.has(k));
 }
 
 /** The token directory: beside the console terminal's sites file. */
@@ -304,6 +320,60 @@ export function fetchSessions(token: Pick<AgentToken, 'addr' | 'token'>, timeout
             sock.write(JSON.stringify({ t: 'bye' }) + '\n');
             return done(undefined, m.sessions ?? []);
           }
+        }
+      }
+    });
+  });
+}
+
+/**
+ * Asks a server to sign a session off (SIGNOFF at a command line, when the screen has one)
+ * and close it. Resolves true when SIGNOFF was typed. Needs tn5250-tui 0.2.1 or later: an
+ * older server answers "unknown request", which is reported as such.
+ */
+export function endSession(token: Pick<AgentToken, 'addr' | 'token'>, session: string, signoff = true, timeoutMs = 15000): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const [host, portText] = splitAddr(token.addr);
+    let buf = '';
+    let greeted = false;
+    let settled = false;
+    const done = (err?: Error, signedOff?: boolean): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      sock.destroy();
+      if (err) reject(err);
+      else resolve(signedOff === true);
+    };
+    const timer = setTimeout(() => done(new Error('timeout')), timeoutMs);
+    const sock: Socket = createConnection({ host, port: Number(portText) }, () => {
+      sock.write(JSON.stringify({ t: 'hello', token: token.token }) + '\n');
+    });
+    sock.setEncoding('utf8');
+    sock.on('error', (e) => done(e));
+    sock.on('close', () => done(new Error('closed')));
+    sock.on('data', (chunk: string) => {
+      buf += chunk;
+      let nl: number;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        let m: WireMsg;
+        try {
+          m = JSON.parse(line) as WireMsg;
+        } catch {
+          continue;
+        }
+        if (m.t === 'error') {
+          const text = m.text || 'error';
+          return done(new Error(/^unknown request/.test(text) ? 'this agent server cannot end sessions (it needs tn5250-tui 0.2.1 or later)' : text));
+        }
+        if (m.t === 'sessions' && !greeted) {
+          greeted = true;
+          sock.write(JSON.stringify({ t: 'end', session, signoff }) + '\n');
+        } else if (m.t === 'ended') {
+          sock.write(JSON.stringify({ t: 'bye' }) + '\n');
+          return done(undefined, m.signoff === true);
         }
       }
     });
