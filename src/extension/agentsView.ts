@@ -1,6 +1,6 @@
 import { dirname } from 'node:path';
 import * as vscode from 'vscode';
-import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, removeSite, sitesPath, writePrivateFile, type AgentSession, type AgentToken } from './agentClient';
+import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, removeSite, sitePasswordForm, sitesPath, writePrivateFile, type AgentSession, type AgentToken } from './agentClient';
 import { installRelease, installedBinary, latestTag, tarExtract } from './agentInstall';
 import { findPassword } from './secretKeys';
 import { resolvedSessions } from './settingsStore';
@@ -390,13 +390,37 @@ export class AgentsProvider implements vscode.TreeDataProvider<AgentNode> {
       void vscode.window.showInformationMessage(`TN5250: no site "${siteName}" in ${path}; nothing to remove.`);
       return;
     }
+    const who = enrolledUser(existing, siteName);
+    const form = sitePasswordForm(existing, siteName);
+    const keyring = form === 'keyring';
+    const REMOVE = 'Remove';
+    const choice = await vscode.window.showWarningMessage(
+      `Remove the AI agent's enrollment ${who || `"${siteName}"`}?`,
+      {
+        modal: true,
+        detail:
+          `Site "${siteName}" (${who || 'unknown'}) is deleted from ${path}.\n\n` +
+          (keyring
+            ? `Its password is in the OS keyring (service tn5250-tui, account site:${siteName.toLowerCase()}). This command cannot delete that item: the extension has no keyring access and tn5250-tui has no command for it yet. To delete both, cancel and delete the site with :sites in tn5250-tui instead; otherwise remove the keyring item with your OS keyring tool.`
+            : form === 'sealed'
+              ? 'Its password is stored encrypted in that file and goes with the entry.'
+              : form === 'clear'
+                ? 'Its password is in clear text in that file and goes with the entry.'
+                : 'It holds no password.'),
+      },
+      REMOVE,
+    );
+    if (choice !== REMOVE) return;
     try {
       writePrivateFile(path, text);
     } catch (e) {
       void vscode.window.showErrorMessage(`TN5250: could not write ${path}: ${(e as Error).message}`);
       return;
     }
-    void vscode.window.showInformationMessage(`TN5250: site "${siteName}" removed from ${path}. A running agent server keeps its open sessions until it exits.`);
+    void vscode.window.showInformationMessage(
+      `TN5250: site "${siteName}" removed from ${path}. A running agent server keeps its open sessions until it exits.` +
+        (keyring ? ` Not removed: its password in the OS keyring (service tn5250-tui, account site:${siteName.toLowerCase()}); delete it with your keyring tool.` : ''),
+    );
   }
 
   /** Writes (or merges) the Claude Code `.mcp.json` of the workspace. */

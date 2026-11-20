@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, mcpHasServer, mergeMcpJson, removeSite, sitesPath, tokenDir, writePrivateFile } from '../../src/extension/agentClient';
+import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, mcpHasServer, mergeMcpJson, removeSite, sitePasswordForm, sitesPath, tokenDir, writePrivateFile } from '../../src/extension/agentClient';
 
 /** A fake `tn5250-tui mcp` viewer listener: hello with the token, then list. */
 function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
@@ -166,5 +166,17 @@ describe.skipIf(process.platform === 'win32')('writePrivateFile', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('sitePasswordForm', () => {
+  const file = (password?: string) => JSON.stringify({ sites: [{ name: 'Agent', user: 'U', host: 'h', ...(password === undefined ? {} : { password }) }] });
+  it('tells clear text, sealed and keyring passwords apart (case-insensitive name)', () => {
+    expect(sitePasswordForm(file('pw'), 'agent')).toBe('clear');
+    expect(sitePasswordForm(file('enc:AAAA'), 'agent')).toBe('sealed');
+    expect(sitePasswordForm(file('keyring:'), 'agent')).toBe('keyring');
+    expect(sitePasswordForm(file(), 'agent')).toBe('none');
+    expect(sitePasswordForm(file('pw'), 'other')).toBe('none');
+    expect(sitePasswordForm('not json', 'agent')).toBe('none');
   });
 });

@@ -135,6 +135,25 @@ export function removeSite(existing: string | undefined, name: string): string |
   return JSON.stringify(root, null, 2) + '\n';
 }
 
+/**
+ * Where the password of the site called name lives, judged by the stored value:
+ * 'keyring' (tn5250-tui moved it to the OS keyring: service tn5250-tui, account
+ * site:<name lower-cased>), 'sealed' (enc:, encrypted in the file), 'clear', or 'none'
+ * (no such site, or no password). Removing the JSON entry deletes only the last two.
+ */
+export function sitePasswordForm(existing: string | undefined, name: string): 'keyring' | 'sealed' | 'clear' | 'none' {
+  try {
+    const site = parseSites(existing).sites!.find((s) => sameName(s.name, name));
+    const pw = typeof site?.password === 'string' ? site.password : '';
+    if (!pw) return 'none';
+    if (pw.startsWith('keyring:')) return 'keyring';
+    if (pw.startsWith('enc:')) return 'sealed';
+    return 'clear';
+  } catch {
+    return 'none';
+  }
+}
+
 /** user@host of the site called name in the sites file's text; '' when there is none (or the text is not JSON). */
 export function enrolledUser(existing: string | undefined, name: string): string {
   try {
