@@ -1335,7 +1335,7 @@
         },
         "tn5250.behavior.pcCommands": {
           "scope": "application",
-          "default": "links",
+          "default": "ask",
           "type": "string",
           "enum": [
             "links",
@@ -1343,7 +1343,7 @@
             "all",
             "off"
           ],
-          "description": "TN5250: PC commands from the host (STRPCCMD). links: open http(s) links only; ask: confirm every command; all: run ANY command the host sends on this PC without asking (the host, or anyone who controls it, can then run anything here); off: show the host's fallback screen. Set it on the TN5250 Settings page."
+          "description": "TN5250: PC commands from the host (STRPCCMD). links: open http(s) links without asking, ask for other commands; ask (default): confirm every command; all: run ANY command the host sends on this PC without asking (the host, or anyone who controls it, can then run anything here); off: show the host's fallback screen. Set it on the TN5250 Settings page."
         },
         "tn5250.display.subfileScrollBar": {
           "default": false,
