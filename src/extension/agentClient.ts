@@ -47,6 +47,19 @@ export type OpenViewer = 'off' | 'panel' | 'editor' | 'window';
 export const sessionKey = (addr: string, session: string): string => `${addr}/${session}`;
 
 /**
+ * When a server started, short enough for a tree row: the time alone for today, else the
+ * month and day as well. Servers of the same site differ mostly by this (one per Claude
+ * conversation), so it is what tells them apart.
+ */
+export function startedLabel(started: string, now = new Date()): string {
+  const d = new Date(started);
+  if (!started || Number.isNaN(d.getTime())) return '';
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  return sameDay ? time : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${time}`;
+}
+
+/**
  * The sessions that became connected since the last look. The first look (prev undefined)
  * reports nothing: sessions that were already there when the view started are not "new".
  */

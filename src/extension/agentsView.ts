@@ -1,6 +1,6 @@
 import { dirname } from 'node:path';
 import * as vscode from 'vscode';
-import { attachArgs, endSession, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, newlyConnected, removeSite, sessionKey, sitePasswordForm, sitesPath, writePrivateFile, type AgentSession, type AgentToken, type OpenViewer } from './agentClient';
+import { attachArgs, endSession, enrollSite, enrolledUser, fetchSessions, findBinary, forgetToken, listTokens, mergeMcpJson, newlyConnected, removeSite, sessionKey, sitePasswordForm, sitesPath, startedLabel, writePrivateFile, type AgentSession, type AgentToken, type OpenViewer } from './agentClient';
 import { installRelease, installedBinary, latestTag, tarExtract } from './agentInstall';
 import { findPassword } from './secretKeys';
 import { resolvedSessions } from './settingsStore';
@@ -29,7 +29,8 @@ export class AgentServerItem extends vscode.TreeItem {
         : sessions.length
           ? `${sessions.length} disconnected`
           : 'idle';
-    this.description = `${state} · ${token.addr}`;
+    const since = startedLabel(token.started);
+    this.description = [state, since && `since ${since}`, `pid ${token.pid}`].filter(Boolean).join(' · ');
     this.iconPath = !sessions ? new vscode.ThemeIcon('debug-disconnect') : this.connected ? icons.on : icons.off;
     this.contextValue = sessions ? 'agent-server' : 'agent-server-dead';
     this.id = `agent-server:${token.addr}`;

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { attachArgs, endSession, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, newlyConnected, sessionKey, mcpHasServer, mergeMcpJson, removeSite, sitePasswordForm, sitesPath, tokenDir, writePrivateFile } from '../../src/extension/agentClient';
+import { attachArgs, endSession, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, newlyConnected, sessionKey, startedLabel, mcpHasServer, mergeMcpJson, removeSite, sitePasswordForm, sitesPath, tokenDir, writePrivateFile } from '../../src/extension/agentClient';
 
 /** A fake `tn5250-tui mcp` viewer listener: hello with the token, then list. */
 function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
@@ -75,6 +75,14 @@ describe('agent client', () => {
     expect(newlyConnected(new Set([a, b]), new Set([a]))).toEqual([]);
     // a session that ended and a new one with the same handle on the same server is new again
     expect(newlyConnected(new Set(), new Set([a]))).toEqual([a]);
+  });
+
+  it('labels a server by when it started: the time today, the date before that', () => {
+    const now = new Date(2026, 10, 22, 9, 0);
+    expect(startedLabel(new Date(2026, 10, 22, 1, 13).toISOString(), now)).toBe('1:13 AM');
+    expect(startedLabel(new Date(2026, 10, 19, 14, 45).toISOString(), now)).toBe('Nov 19 2:45 PM');
+    expect(startedLabel('', now)).toBe('');
+    expect(startedLabel('not a date', now)).toBe('');
   });
 
   it('rejects a wrong token and a dead server', async () => {
