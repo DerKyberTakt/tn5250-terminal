@@ -7,3 +7,6 @@ captures/
 
 # session traces and packages are never committed
 tn5250-trace-*.json
+
+# saved session traces (any name): never committed
+*[Tt]race*.json

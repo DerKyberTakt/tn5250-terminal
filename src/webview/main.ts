@@ -8,6 +8,7 @@ import { ConnectionOverlay } from './connectionOverlay';
 import { FindBar } from './findBar';
 import { dragUnits } from './gui';
 import { Renderer, type ScrollBarTarget } from './renderer';
+import { snapshotCursorHidden } from '../shared/hiddenCursor';
 
 const vscode = acquireVsCodeApi();
 
@@ -48,6 +49,15 @@ const keyLines: string[] = [];
 function post(message: WebviewToHost): void {
   vscode.postMessage(message);
 }
+
+/** The cursor of the last screen is in a non-display field: the key overlay names no keys typed there. */
+let cursorInHiddenField = false;
+/**
+ * A key went to the host and the screen it produces (with the cursor's new place) has not
+ * arrived yet: Tab into a password field, then a fast first letter. Until it arrives the
+ * overlay treats the cursor as being in a non-display field.
+ */
+let awaitingScreen = false;
 
 function logKey(line: string): void {
   if (!config.keyOverlay) return;
@@ -166,6 +176,7 @@ function applyConfig(): void {
   });
   renderer.setOptions({
     uiMode: st.uiMode,
+    textWindows: st.enhancedTextWindows,
     autoFit: st.autoFit,
     fillWindow: st.fillWindow,
     screenOverflow: st.screenOverflow,
@@ -229,6 +240,8 @@ window.addEventListener('message', (ev: MessageEvent<HostToWebview>) => {
     case 'screen':
       lastScreen = { rows: msg.screen.rows, cols: msg.screen.cols, fields: msg.screen.fields };
       hostMouseEvents = msg.screen.gui?.mouseEvents ?? [];
+      cursorInHiddenField = snapshotCursorHidden(msg.screen);
+      awaitingScreen = false;
       renderer.setScreen(msg.screen);
       findBar.refresh();
       renderOia();
@@ -435,12 +448,15 @@ window.addEventListener(
       return;
     }
     if (result.kind === 'text') {
-      logKey(`${keyName(info)}  -> text`);
+      // The overlay never shows what goes into a password field.
+      logKey(cursorInHiddenField || awaitingScreen ? '(key)  -> text, non-display field' : `${keyName(info)}  -> text`);
+      awaitingScreen = true;
       post({ type: 'text', text: result.text });
     } else if (result.kind === 'action' && result.action === 'printScreen') {
       post({ type: 'printScreen' });
     } else if (result.kind === 'action') {
       logKey(`${keyName(info)}  -> ${result.action}`);
+      awaitingScreen = true;
       post({ type: 'action', action: result.action });
     } else {
       logKey(`${keyName(info)}  -> (unmapped)`);

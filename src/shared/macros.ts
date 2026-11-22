@@ -119,6 +119,12 @@ export function describeStep(step: MacroStep): string {
   }
 }
 
+/** Whether the cursor of a screen is in a non-display (password) field: the recorder must not keep what is typed there. */
+export function cursorInHiddenField(screen: { cursor: number; fieldAt(addr: number): { attr: number } | undefined }): boolean {
+  const f = screen.fieldAt(screen.cursor);
+  return !!f && (f.attr & 0x07) === 0x07;
+}
+
 /**
  * Collects what the user does in a session into steps: consecutive characters become
  * one text step, a key the host answers is followed by a wait for input, local actions
@@ -135,16 +141,30 @@ export class MacroRecorder {
     this.lastInputAt = this.startedAt;
   }
 
-  text(text: string): void {
+  /**
+   * `hidden`: the cursor is in a non-display (password) field. What is typed there is
+   * never stored: the macro gets one hidden prompt step instead, so playback asks for the
+   * value (see cursorInHiddenField).
+   */
+  text(text: string, hidden = false): void {
     if (!text) return;
     this.lastInputAt = this.now();
+    if (hidden) {
+      const last = this.steps[this.steps.length - 1];
+      if (!(last?.type === 'prompt' && last.secret)) this.steps.push({ type: 'prompt', label: 'Password', secret: true });
+      return;
+    }
     const last = this.steps[this.steps.length - 1];
     if (last?.type === 'text') last.text += text;
     else this.steps.push({ type: 'text', text });
   }
 
   /** A paste: its lines as typed text, a New Line between them (the nearest a macro step comes to the block paste). */
-  paste(text: string): void {
+  paste(text: string, hidden = false): void {
+    if (hidden) {
+      this.text(text, true);
+      return;
+    }
     const lines = text.replace(/\r\n?/g, '\n').split('\n');
     if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
     lines.forEach((line, i) => {
@@ -349,6 +369,22 @@ function sanitizeStep(v: unknown): MacroStep | undefined {
   }
 }
 
+const KEY_RULE = /^(?:(?:Ctrl|Alt|Meta|Shift)\+)*(?:F\d{1,2}|[^\s+]+)$/;
+
+/**
+ * Why a key cannot run a macro, or undefined when it can: modifiers then the key in
+ * keyName() form, a function key or a Ctrl/Alt/Meta combination (so plain typing, Enter,
+ * Backspace and Tab are never taken over).
+ */
+export function macroKeyProblem(key: string): string | undefined {
+  if (!key) return undefined;
+  if (!KEY_RULE.test(key)) return 'Modifiers then the key, as "Ctrl+Alt+1", "Alt+F5" or "F24".';
+  if (!/^(?:Ctrl|Alt|Meta)\+/.test(key) && !/^(?:Shift\+)?F\d{1,2}$/.test(key)) return 'Use a function key, or a combination with Ctrl, Alt or Meta, so typing is not affected.';
+  // A character key carries its shift state in the character: Shift+1 arrives as "!".
+  if (/Shift\+[^+]$/.test(key)) return 'With Shift, name the character the key produces instead: "Ctrl+!" for Ctrl+Shift+1.';
+  return undefined;
+}
+
 /** A macro read from a settings file: anything malformed is dropped, step by step. */
 export function sanitizeMacro(v: unknown): Macro | undefined {
   if (!v || typeof v !== 'object') return undefined;
@@ -379,7 +415,7 @@ export function macrosToJson(macros: Macro[]): string {
 }
 
 /** Macros from an exported file; undefined when the text is not such a file. Malformed macros are dropped. */
-export function macrosFromJson(text: string): Macro[] | undefined {
+export function macrosFromJson(text: string, refusedKeys?: string[]): Macro[] | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text.replace(/^\uFEFF/, ''));
@@ -388,7 +424,19 @@ export function macrosFromJson(text: string): Macro[] | undefined {
   }
   const list = Array.isArray(parsed) ? parsed : parsed && typeof parsed === 'object' && Array.isArray((parsed as { macros?: unknown }).macros) ? (parsed as { macros: unknown[] }).macros : undefined;
   if (!list) return undefined;
-  return list.map(sanitizeMacro).filter((m): m is Macro => !!m);
+  // A file from someone else binds no bare function key and no key the rule refuses (Enter,
+  // Backspace, ...): such a key would run its steps on an ordinary key press. The macro
+  // comes in without a key, and the key is listed in `refusedKeys`.
+  return list
+    .map(sanitizeMacro)
+    .filter((m): m is Macro => !!m)
+    .map((m) => {
+      if (m.key && (macroKeyProblem(m.key) || !/^(?:Ctrl|Alt|Meta)\+/.test(m.key))) {
+        refusedKeys?.push(`${m.name}: ${m.key}`);
+        return { ...m, key: '' };
+      }
+      return m;
+    });
 }
 
 export interface MergeMacrosResult {

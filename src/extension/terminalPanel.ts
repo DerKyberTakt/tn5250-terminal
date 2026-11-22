@@ -526,11 +526,11 @@ Trust it only if this fingerprint matches what the system administrator shows fo
         this.controller?.press(msg.action);
         break;
       case 'text':
-        this.recorder?.text(msg.text);
+        this.recorder?.text(msg.text, this.controller?.cursorHidden === true);
         this.controller?.type(msg.text);
         break;
       case 'pasteText':
-        this.recorder?.paste(msg.text);
+        this.recorder?.paste(msg.text, this.controller?.cursorHidden === true);
         this.controller?.paste(msg.text, msg.options);
         break;
       case 'macro':
@@ -564,7 +564,9 @@ Trust it only if this fingerprint matches what the system administrator shows fo
         if (/^https?:\/\//i.test(msg.url)) void vscode.env.openExternal(vscode.Uri.parse(msg.url));
         break;
       case 'key':
-        if (this.keyOverlay) {
+        if (this.keyOverlay && this.controller?.cursorHidden) {
+          this.output.appendLine('key (not logged: cursor in a non-display field)');
+        } else if (this.keyOverlay) {
           const m = msg.event;
           const mods = [m.ctrl && 'Ctrl', m.shift && 'Shift', m.alt && 'Alt', m.meta && 'Meta'].filter(Boolean).join('+');
           this.output.appendLine(`key ${mods ? mods + '+' : ''}${m.key} (${m.code})`);

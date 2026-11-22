@@ -1,9 +1,9 @@
-import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, rmSync, statSync, chmodSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { attachArgs, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, mcpHasServer, mergeMcpJson, removeSite, sitesPath, tokenDir } from '../../src/extension/agentClient';
+import { attachArgs, endSession, enrollSite, enrolledUser, fetchSessions, findBinary, listTokens, newlyConnected, sessionKey, startedLabel, mcpHasServer, mergeMcpJson, removeSite, sitePasswordForm, sitesPath, tokenDir, writePrivateFile } from '../../src/extension/agentClient';
 
 /** A fake `tn5250-tui mcp` viewer listener: hello with the token, then list. */
 function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
@@ -16,7 +16,7 @@ function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
         buf += chunk;
         let nl: number;
         while ((nl = buf.indexOf('\n')) >= 0) {
-          const m = JSON.parse(buf.slice(0, nl)) as { t: string; token?: string };
+          const m = JSON.parse(buf.slice(0, nl)) as { t: string; token?: string; session?: string; signoff?: boolean };
           buf = buf.slice(nl + 1);
           if (m.t === 'hello') {
             if (m.token !== token) {
@@ -28,6 +28,10 @@ function fakeServer(token: string): Promise<{ server: Server; addr: string }> {
             sock.write(JSON.stringify({ t: 'sessions', sessions: [{ session: 's1', host: 'PUB400.COM', device: 'QPADEV0001', connected: true, seq: 7, inhibited: 'none' }] }) + '\n');
           } else if (m.t === 'list' && ok) {
             sock.write(JSON.stringify({ t: 'sessions', sessions: [] }) + '\n');
+          } else if (m.t === 'end' && ok) {
+            if (m.session === 'old') sock.write(JSON.stringify({ t: 'error', text: 'unknown request end' }) + '\n');
+            else if (m.session !== 's1') sock.write(JSON.stringify({ t: 'error', text: `no session "${m.session}"` }) + '\n');
+            else sock.write(JSON.stringify({ t: 'ended', session: m.session, signoff: m.signoff === true }) + '\n');
           } else if (m.t === 'bye') {
             sock.end();
           }
@@ -51,6 +55,34 @@ describe('agent client', () => {
   it('fetches the session list with the token', async () => {
     const sessions = await fetchSessions({ addr: srv.addr, token: 'tok' });
     expect(sessions).toEqual([{ session: 's1', host: 'PUB400.COM', device: 'QPADEV0001', connected: true, seq: 7, inhibited: 'none' }]);
+  });
+
+  it('ends a session: signed off when asked, a clear error from an older server or for an unknown session', async () => {
+    await expect(endSession({ addr: srv.addr, token: 'tok' }, 's1')).resolves.toBe(true);
+    await expect(endSession({ addr: srv.addr, token: 'tok' }, 's1', false)).resolves.toBe(false);
+    await expect(endSession({ addr: srv.addr, token: 'tok' }, 'old')).rejects.toThrow(/0\.2\.1 or later/);
+    await expect(endSession({ addr: srv.addr, token: 'tok' }, 's9')).rejects.toThrow(/no session/);
+    await expect(endSession({ addr: srv.addr, token: 'nope' }, 's1')).rejects.toThrow(/bad token/);
+  });
+
+  it('knows which sessions are new: nothing on the first look, then only those that connected since', () => {
+    const a = sessionKey('127.0.0.1:1', 's1');
+    const b = sessionKey('127.0.0.1:1', 's2');
+    const c = sessionKey('127.0.0.1:2', 's1');
+    expect(a).not.toBe(c);
+    expect(newlyConnected(undefined, new Set([a, b]))).toEqual([]);
+    expect(newlyConnected(new Set([a]), new Set([a, b, c]))).toEqual([b, c]);
+    expect(newlyConnected(new Set([a, b]), new Set([a]))).toEqual([]);
+    // a session that ended and a new one with the same handle on the same server is new again
+    expect(newlyConnected(new Set(), new Set([a]))).toEqual([a]);
+  });
+
+  it('labels a server by when it started: the time today, the date before that', () => {
+    const now = new Date(2026, 10, 22, 9, 0);
+    expect(startedLabel(new Date(2026, 10, 22, 1, 13).toISOString(), now)).toBe('1:13 AM');
+    expect(startedLabel(new Date(2026, 10, 19, 14, 45).toISOString(), now)).toBe('Nov 19 2:45 PM');
+    expect(startedLabel('', now)).toBe('');
+    expect(startedLabel('not a date', now)).toBe('');
   });
 
   it('rejects a wrong token and a dead server', async () => {
@@ -147,5 +179,53 @@ describe('AI Agent page status helpers', () => {
     expect(mcpHasServer('{"mcpServers":{"other":{}}}')).toBe(false);
     expect(mcpHasServer(mergeMcpJson(undefined, { binary: 'tn5250-tui', site: 'agent', readOnly: true }))).toBe(true);
     expect(mcpHasServer('nope')).toBe(false);
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('writePrivateFile', () => {
+  it('creates the directory 0700 and the file 0600, and tightens an existing 0644 file', () => {
+    const root = mkdtempSync(join(tmpdir(), 'tn5250-priv-'));
+    try {
+      const file = join(root, 'cfg', 'sites.json');
+      writePrivateFile(file, '{"a":1}\n');
+      expect(statSync(join(root, 'cfg')).mode & 0o777).toBe(0o700);
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+      chmodSync(file, 0o644);
+      writePrivateFile(file, '{"a":2}\n');
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+      expect(readFileSync(file, 'utf8')).toBe('{"a":2}\n');
+      expect(readdirSync(join(root, 'cfg'))).toEqual(['sites.json']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('sitePasswordForm', () => {
+  const file = (password?: string) => JSON.stringify({ sites: [{ name: 'Agent', user: 'U', host: 'h', ...(password === undefined ? {} : { password }) }] });
+  it('tells clear text, sealed and keyring passwords apart (case-insensitive name)', () => {
+    expect(sitePasswordForm(file('pw'), 'agent')).toBe('clear');
+    expect(sitePasswordForm(file('enc:AAAA'), 'agent')).toBe('sealed');
+    expect(sitePasswordForm(file('keyring:'), 'agent')).toBe('keyring');
+    expect(sitePasswordForm(file(), 'agent')).toBe('none');
+    expect(sitePasswordForm(file('pw'), 'other')).toBe('none');
+    expect(sitePasswordForm('not json', 'agent')).toBe('none');
+  });
+});
+
+describe('mergeMcpJson keeps what the user added to the tn5250 entry', () => {
+  it('keeps --audit, other args and env; changes only binary, --site and --read-only', () => {
+    const existing = JSON.stringify({
+      mcpServers: { tn5250: { command: 'old', args: ['mcp', '--site', 'x', '--read-only', '--audit', 'audit.jsonl'], env: { TN5250_TUI_SECRETS: 'file' }, type: 'stdio' } },
+    });
+    const out = JSON.parse(mergeMcpJson(existing, { binary: 'new', site: 'agent', readOnly: false })) as { mcpServers: { tn5250: Record<string, unknown> } };
+    expect(out.mcpServers.tn5250).toEqual({
+      command: 'new',
+      args: ['mcp', '--site', 'agent', '--audit', 'audit.jsonl'],
+      env: { TN5250_TUI_SECRETS: 'file' },
+      type: 'stdio',
+    });
+    const again = JSON.parse(mergeMcpJson(JSON.stringify(out), { binary: 'new', site: 'agent', readOnly: true })) as typeof out;
+    expect(again.mcpServers.tn5250.args).toEqual(['mcp', '--site', 'agent', '--read-only', '--audit', 'audit.jsonl']);
   });
 });

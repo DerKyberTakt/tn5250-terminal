@@ -70,7 +70,7 @@ Open the TN5250 Settings page (the gear in the TN5250 side bar, or **TN5250: Ope
 | **Agent Sessions view** (`tn5250.agent.enabled`) | Shows the Agent Sessions view in the TN5250 side bar. Off by default. |
 | **tn5250-tui** (`tn5250.agent.binary`) | Path of the console terminal. Empty = found on PATH or in the installer's folder; Browse picks one. The page says which one was found. |
 | **Site** (`tn5250.agent.site`) | The site the agent signs on with; `agent` by default. The page says who is enrolled under that name. |
-| **Read-only server** (`tn5250.agent.readOnly`) | Starts the server with `--read-only`: typed text that starts a command that changes things (`DLT*`, `CLR*`, `CHG*`, `CRT*`, `RMV*`, `UPD*`, `SBMJOB`, `CALL`, `RUNSQL`, ...) is refused. On by default; turn it off only for an agent that is meant to change things. |
+| **Read-only server** (`tn5250.agent.readOnly`) | Starts the server with `--read-only`: typed text that starts a command that changes things (`DLT*`, `CLR*`, `CHG*`, `CRT*`, `RMV*`, `UPD*`, `SBMJOB`, `CALL`, `RUNSQL`, ...) is refused. It is not a fence: it does not see what a menu option or a program does, so the agent profile's authority on the host is the real limit. On by default; turn it off only for an agent that is meant to change things. |
 
 These are application-wide settings with their own **Save** button on that page.
 
@@ -110,6 +110,20 @@ While it works, the **Agent Sessions** view shows every running server and its s
 - A server whose process has ended disappears on its own. One that still runs but does not answer shows as *not answering* with a **Forget** button; **Clean Up Agent Servers** (view title) forgets all of them at once.
 
 From any terminal, `tn5250-tui attach --list` prints the running servers and their sessions, and `tn5250-tui attach s2` watches one (Tab cycles sessions, `r` reloads, `q` quits).
+
+### Opening and closing viewers
+
+- **Open by itself.** `tn5250.agent.openViewer` says what happens when an agent session connects: `off` (nothing, the default), `panel` (terminal panel), `editor` (beside the active editor) or `window` (its own window). A viewer that opens by itself is created in its place, so your layout stays as it is, and it does not take the keyboard focus. **TN5250: Watch Next Agent Session** (the eye in the view's title) does the same once, for the next session only: arm it, then start the agent.
+- **A short run.** With one of these on, the view looks for new sessions several times a second, also while it is hidden, so a ten-second run is on screen from its first screens. From a terminal, `tn5250-tui attach --wait` does the same without VS Code, and `--follow` goes back to waiting when the session ends.
+- **When a session ends,** its viewer closes a few seconds later and the session leaves the list. A viewer never shows the next session in an old tab.
+- **Sign Off and Close** (the arrow on a session row) types SIGNOFF at the session's command line, when its screen has one, and closes it; **Sign Off and Close All** in the view's title does it for every agent session after one confirmation. Use it when the host says the user has reached the device session limit (CPF1220). Both need tn5250-tui 0.2.1 or later; `tn5250-tui attach --end s1` (or `--end all`) is the same from a terminal. When the agent's server exits, it signs its sessions off the same way.
+- **Reading it on a call.** The viewer is a terminal: its size follows the terminal font. `Ctrl` + `=` / `-` zoom the whole window; `terminal.integrated.fontSize` sets the terminal alone, and `terminal.integrated.mouseWheelZoom` lets Ctrl + wheel do it.
+
+### Sign-on results
+
+`connect` says `signed_on: true` only when the host accepted the sign-on. A refused sign-on is an error that carries the host's message, the connection is closed, and the server does not try that password again for that user and host until the site's password changes or the server restarts: every refused attempt counts toward disabling the profile. "Too many sessions" (CPF1220) is reported as its own error and is not remembered as a password problem.
+
+The first screen after a sign-on is often Display Messages with old job messages. The agent presses Enter and goes on; to keep it from appearing, clear the message queue once by hand (F13 on that display) or set the profile's delivery mode to `*HOLD` or `*NOTIFY` (`CHGMSGQ MSGQ(*USRPRF) DLVRY(*NOTIFY)`).
 
 ## 6. Audit and traces
 

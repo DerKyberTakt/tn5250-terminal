@@ -7,7 +7,7 @@
  * and speaks JSON lines on 127.0.0.1:<port>: a hello with the token, then `list`
  * requests answered with `sessions`.
  */
-import { readdirSync, readFileSync, statSync, unlinkSync, accessSync, constants } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, accessSync, constants } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { Socket, createConnection } from 'node:net';
@@ -37,6 +37,35 @@ interface WireMsg {
   session?: string;
   sessions?: AgentSession[];
   text?: string;
+  signoff?: boolean;
+}
+
+/** When a viewer opens by itself for a new agent session. */
+export type OpenViewer = 'off' | 'panel' | 'editor' | 'window';
+
+/** The key of one agent session across servers. */
+export const sessionKey = (addr: string, session: string): string => `${addr}/${session}`;
+
+/**
+ * When a server started, short enough for a tree row: the time alone for today, else the
+ * month and day as well. Servers of the same site differ mostly by this (one per Claude
+ * conversation), so it is what tells them apart.
+ */
+export function startedLabel(started: string, now = new Date()): string {
+  const d = new Date(started);
+  if (!started || Number.isNaN(d.getTime())) return '';
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  return sameDay ? time : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${time}`;
+}
+
+/**
+ * The sessions that became connected since the last look. The first look (prev undefined)
+ * reports nothing: sessions that were already there when the view started are not "new".
+ */
+export function newlyConnected(prev: ReadonlySet<string> | undefined, now: ReadonlySet<string>): string[] {
+  if (!prev) return [];
+  return [...now].filter((k) => !prev.has(k));
 }
 
 /** The token directory: beside the console terminal's sites file. */
@@ -55,6 +84,30 @@ export function tokenDir(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.
 export function sitesPath(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string {
   if (env.TN5250_TUI_CONFIG) return env.TN5250_TUI_CONFIG;
   return join(dirname(tokenDir(env, platform)), 'sites.json');
+}
+
+/**
+ * Writes a file that may hold a clear-text password: directory 0700 (when it has to be
+ * created), file 0600, written to a temp file beside it and renamed over the target, so
+ * the secret is never in a file with default modes. An existing file is chmod'ed too.
+ * Modes are a no-op on Windows (the profile's ACLs apply).
+ */
+export function writePrivateFile(path: string, text: string, platform: NodeJS.Platform = process.platform): void {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmp, text, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    if (platform !== 'win32') chmodSync(tmp, 0o600);
+    renameSync(tmp, path);
+  } catch (e) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      /* no temp file to remove */
+    }
+    throw e;
+  }
+  if (platform !== 'win32') chmodSync(path, 0o600);
 }
 
 /** A site as the console terminal stores it; the password is clear text by its design. */
@@ -109,6 +162,25 @@ export function removeSite(existing: string | undefined, name: string): string |
   if (root.sites.length === before) return undefined;
   if (sameName(root.lastUsed, name)) root.lastUsed = '';
   return JSON.stringify(root, null, 2) + '\n';
+}
+
+/**
+ * Where the password of the site called name lives, judged by the stored value:
+ * 'keyring' (tn5250-tui moved it to the OS keyring: service tn5250-tui, account
+ * site:<name lower-cased>), 'sealed' (enc:, encrypted in the file), 'clear', or 'none'
+ * (no such site, or no password). Removing the JSON entry deletes only the last two.
+ */
+export function sitePasswordForm(existing: string | undefined, name: string): 'keyring' | 'sealed' | 'clear' | 'none' {
+  try {
+    const site = parseSites(existing).sites!.find((s) => sameName(s.name, name));
+    const pw = typeof site?.password === 'string' ? site.password : '';
+    if (!pw) return 'none';
+    if (pw.startsWith('keyring:')) return 'keyring';
+    if (pw.startsWith('enc:')) return 'sealed';
+    return 'clear';
+  } catch {
+    return 'none';
+  }
 }
 
 /** user@host of the site called name in the sites file's text; '' when there is none (or the text is not JSON). */
@@ -267,6 +339,60 @@ export function fetchSessions(token: Pick<AgentToken, 'addr' | 'token'>, timeout
   });
 }
 
+/**
+ * Asks a server to sign a session off (SIGNOFF at a command line, when the screen has one)
+ * and close it. Resolves true when SIGNOFF was typed. Needs tn5250-tui 0.2.1 or later: an
+ * older server answers "unknown request", which is reported as such.
+ */
+export function endSession(token: Pick<AgentToken, 'addr' | 'token'>, session: string, signoff = true, timeoutMs = 15000): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const [host, portText] = splitAddr(token.addr);
+    let buf = '';
+    let greeted = false;
+    let settled = false;
+    const done = (err?: Error, signedOff?: boolean): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      sock.destroy();
+      if (err) reject(err);
+      else resolve(signedOff === true);
+    };
+    const timer = setTimeout(() => done(new Error('timeout')), timeoutMs);
+    const sock: Socket = createConnection({ host, port: Number(portText) }, () => {
+      sock.write(JSON.stringify({ t: 'hello', token: token.token }) + '\n');
+    });
+    sock.setEncoding('utf8');
+    sock.on('error', (e) => done(e));
+    sock.on('close', () => done(new Error('closed')));
+    sock.on('data', (chunk: string) => {
+      buf += chunk;
+      let nl: number;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        let m: WireMsg;
+        try {
+          m = JSON.parse(line) as WireMsg;
+        } catch {
+          continue;
+        }
+        if (m.t === 'error') {
+          const text = m.text || 'error';
+          return done(new Error(/^unknown request/.test(text) ? 'this agent server cannot end sessions (it needs tn5250-tui 0.2.1 or later)' : text));
+        }
+        if (m.t === 'sessions' && !greeted) {
+          greeted = true;
+          sock.write(JSON.stringify({ t: 'end', session, signoff }) + '\n');
+        } else if (m.t === 'ended') {
+          sock.write(JSON.stringify({ t: 'bye' }) + '\n');
+          return done(undefined, m.signoff === true);
+        }
+      }
+    });
+  });
+}
+
 function splitAddr(addr: string): [string, string] {
   const i = addr.lastIndexOf(':');
   return i < 0 ? [addr, '0'] : [addr.slice(0, i), addr.slice(i + 1)];
@@ -283,9 +409,27 @@ export function mergeMcpJson(existing: string | undefined, opts: { binary: strin
   if (existing && existing.trim()) {
     root = JSON.parse(existing) as typeof root;
   }
-  const args = ['mcp'];
+  const servers = root.mcpServers ?? {};
+  const prev = servers.tn5250;
+  const old = prev && typeof prev === 'object' && !Array.isArray(prev) ? (prev as Record<string, unknown>) : {};
+  // The command owns the binary, `mcp`, --site and --read-only; every other argument and
+  // every other key of an existing entry (env, --audit FILE, ...) is the user's and stays.
+  const kept: unknown[] = [];
+  const oldArgs: unknown[] = Array.isArray(old.args) ? old.args : [];
+  for (let i = 0; i < oldArgs.length; i++) {
+    const a = oldArgs[i];
+    if (a === 'mcp' && i === 0) continue;
+    if (a === '--site' || a === '-site') {
+      i += 1; // its value
+      continue;
+    }
+    if (typeof a === 'string' && (/^--?site=/.test(a) || a === '--read-only' || a === '-read-only' || /^--?read-only=/.test(a))) continue;
+    kept.push(a);
+  }
+  const args: unknown[] = ['mcp'];
   if (opts.site.trim()) args.push('--site', opts.site.trim());
   if (opts.readOnly) args.push('--read-only');
-  root.mcpServers = { ...(root.mcpServers ?? {}), tn5250: { command: opts.binary, args } };
+  args.push(...kept);
+  root.mcpServers = { ...servers, tn5250: { ...old, command: opts.binary, args } };
   return JSON.stringify(root, null, 2) + '\n';
 }
