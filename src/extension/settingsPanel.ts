@@ -22,6 +22,16 @@ export class SettingsPanel {
   static readonly viewType = 'tn5250.settings';
   private static current: SettingsPanel | undefined;
 
+  /** The profile the open page shows (-1 = Defaults); undefined when the page is closed. */
+  static get shown(): number | undefined {
+    return SettingsPanel.current?.select;
+  }
+
+  /** Brings the open page to the front as it is, unsaved changes included. */
+  static reveal(): void {
+    SettingsPanel.current?.panel.reveal();
+  }
+
   static show(context: vscode.ExtensionContext, output: vscode.OutputChannel, select = -1): void {
     if (SettingsPanel.current) {
       SettingsPanel.current.select = select;

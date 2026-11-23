@@ -61,6 +61,37 @@ body {
   color: var(--vscode-list-activeSelectionForeground);
 }
 
+/* Defaults is not a connection: a box of its own, in the warning tone, above the list. */
+.nav button.entry.defaults {
+  width: calc(100% - 16px);
+  margin: 2px 8px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--vscode-editorWarning-foreground, #cca700);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 10%, transparent);
+}
+
+.nav button.entry.defaults:hover {
+  background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 20%, transparent);
+}
+
+.nav button.entry.defaults.active {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.nav button.entry.defaults .entry-name {
+  display: block;
+  font-weight: 600;
+}
+
+.nav button.entry.defaults .entry-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
 button.link {
   background: none;
   border: none;
@@ -274,6 +305,29 @@ select {
 .vk {
   margin: 4px 0 14px;
   user-select: none;
+}
+
+.vk-layout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.vk-layout label {
+  white-space: nowrap;
+}
+
+.vk-layout select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 180px;
+  padding: 2px 4px;
+  color: var(--vscode-dropdown-foreground);
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border, transparent);
+  border-radius: 2px;
+  font: inherit;
 }
 
 .vk-blocks {
