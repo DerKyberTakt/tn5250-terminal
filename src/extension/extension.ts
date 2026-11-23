@@ -4,6 +4,7 @@ import { SettingsPanel } from './settingsPanel';
 import { SessionItem, SessionsProvider, TabItem } from './sessionsView';
 import { HistoryItem, HistoryProvider, HistoryStore, detailRows } from './historyView';
 import { resolveSettings } from '../shared/settings';
+import { settingsTarget } from '../shared/settingsTarget';
 import { readDefaults, readSessions, removeSessionAt, resolvedSessions, writeSessions } from './settingsStore';
 import { importKmpInteractive } from './kmpCommand';
 import { importConnectionsInteractive } from './importCommand';
@@ -164,8 +165,11 @@ export function activate(context: vscode.ExtensionContext): void {
   register('tn5250.openSettings', () => {
     const list = resolvedSessions();
     const last = context.globalState.get<string>(LAST_SESSION_KEY);
-    const index = list.length ? Math.max(0, list.findIndex((s) => s.name === last)) : -1;
-    SettingsPanel.show(context, output, index);
+    // The connection of the terminal being looked at; without one, the last one connected.
+    const fallback = list.length ? Math.max(0, list.findIndex((s) => s.name === last)) : -1;
+    const target = settingsTarget(list, TerminalPanel.active?.profile, SettingsPanel.shown, fallback);
+    if (target === 'keep') SettingsPanel.reveal();
+    else SettingsPanel.show(context, output, target.select);
   });
   register('tn5250.setCertPassphrase', () => setCertPassphraseInteractive(context, -1));
   register('tn5250.newTab', () => {
