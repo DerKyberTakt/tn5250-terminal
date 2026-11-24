@@ -132,7 +132,6 @@ tabIcon: 'tabs.icon',
   alarm: 'behavior.alarm',
   keyClick: 'behavior.keyClick',
   pcCommands: 'behavior.pcCommands',
-  subfileScrollBar: 'display.subfileScrollBar',
   keymap: 'keyboard.keymap',
   keyWarningsIgnored: 'keyboard.warningsIgnored',
 };
