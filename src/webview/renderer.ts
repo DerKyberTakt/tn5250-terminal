@@ -8,6 +8,10 @@ import { inferTextWindows } from '../shared/textWindows';
 import { fitFont, shrinkScale } from './fit';
 import { placeWatermark, tileWatermark } from './watermark';
 import { scrollBarGeometry, scrollBarHit, type Rect, type ScrollBarGeometry, type ScrollHit } from './gui';
+import { nextPaging, pagingBar, type PageView, type PagingState } from './subfilePaging';
+
+/** The lists whose page is remembered while another screen is shown. */
+const PAGING_KEPT = 8;
 
 /** Width of the gutter right of the text where the synthetic subfile scroll bar lives. */
 const GUTTER = 18;
@@ -182,8 +186,6 @@ export interface RendererOptions {
   watermarkOffsetY: number;
   underlineUrls: boolean;
   keyButtons: boolean;
-  /** Draw a scroll bar beside every subfile (More... / Bottom), not only host-defined ones. */
-  subfileScrollBar: boolean;
   /** Enhanced mode: frame windows the host drew with border characters like its GUI windows. */
   textWindows: boolean;
   demoMode: boolean;
@@ -236,7 +238,6 @@ export class Renderer {
     watermarkOffsetY: 0,
     underlineUrls: true,
     keyButtons: false,
-    subfileScrollBar: false,
     textWindows: true,
     demoMode: false,
     demoLabel: 'DEMO',
@@ -268,6 +269,12 @@ export class Renderer {
   private scrollHover: ScrollBarTarget | undefined;
   /** While the thumb of a host bar is dragged: the position it is shown at. */
   private thumbPreview: { addr: number; pos: number } | undefined;
+  /** While the thumb of a synthetic bar is dragged: the page it is shown at. */
+  private subfilePreview: { index: number; pos: number } | undefined;
+  /** Which page each synthetic bar's list is on (same order as `subfiles`). */
+  private paging: Array<PagingState | undefined> = [];
+  /** The same by list, so a list keeps its page while a help or detail screen is shown. */
+  private pagingKept = new Map<string, PagingState>();
   /** Extra canvas width right of the text (synthetic scroll bar). */
   private gutter = 0;
   /** Find on screen: the matches drawn over the text, and the translucent fill they get. */
@@ -313,12 +320,44 @@ export class Renderer {
     this.ranges = fieldRanges(screen);
     this.boxRanges = markedFieldRanges(screen);
     this.syntax = highlightScreen(screen);
-    this.subfiles = this.options.subfileScrollBar && !screen.gui?.scrollBars.length ? detectSubfiles(screen) : [];
+    // A list without a scroll bar of the host (More... / Bottom) gets one drawn beside it.
+    this.subfiles = !screen.gui?.scrollBars.length ? detectSubfiles(screen) : [];
+    this.trackPaging(screen);
     this.refreshWindows();
     this.selectionMask = selectionWidgetCells(screen);
     this.thumbPreview = undefined;
+    this.subfilePreview = undefined;
     if (resized) this.layout();
     this.draw();
+  }
+
+  /** The synthetic bar of a subfile in pages: how many there are (as far as known) and which one is shown. */
+  subfileBar(index: number): { total: number; pos: number } {
+    return pagingBar(this.paging[index], this.subfiles[index]?.end ?? 'more');
+  }
+
+  /** Follows the lists with a synthetic bar from screen to screen, so the thumb shows the page. */
+  private trackPaging(screen: ScreenSnapshot): void {
+    this.paging = this.subfiles.map((area) => {
+      const view = this.pageView(screen, area);
+      const next = nextPaging(this.pagingKept.get(view.key), view, screen.paged ?? 0);
+      // Newest last; the oldest list goes when there are too many.
+      this.pagingKept.delete(view.key);
+      this.pagingKept.set(view.key, next);
+      if (this.pagingKept.size > PAGING_KEPT) this.pagingKept.delete(this.pagingKept.keys().next().value as string);
+      return next;
+    });
+  }
+
+  /** What identifies a list (its place and heading) and its records, without what is typed into them. */
+  private pageView(screen: ScreenSnapshot, area: SubfileArea): PageView {
+    const rows: string[] = [];
+    for (let r = area.top; r < area.bottom; r++) {
+      let row = '';
+      for (let i = r * screen.cols; i < (r + 1) * screen.cols; i++) row += this.fieldMask[i] === 1 ? ' ' : screen.text.charAt(i);
+      rows.push(row);
+    }
+    return { key: `${area.top}|${area.top > 0 ? rowText(screen, area.top - 1).trim() : ''}`, rows, end: area.end };
   }
 
   /** The scroll bars on the screen: the host's, or the synthetic subfile ones. */
@@ -347,6 +386,7 @@ export class Renderer {
     // Synthetic: in the gutter right of the text, as tall as the subfile block plus its marker row.
     const a = ref.area;
     const size = a.bottom - a.top + 1;
+    const bar = this.subfileBar(ref.index);
     return scrollBarGeometry({
       horizontal: false,
       x: this.x(this.screen?.cols ?? 80) + 2 / this.scaleXValue,
@@ -354,9 +394,9 @@ export class Renderer {
       cellW: (GUTTER - 4) / this.scaleXValue,
       cellH: this.cellH,
       size,
-      // Position is unknown for a synthetic bar: the thumb sits at the top while there is more, at the bottom on the last page.
-      total: 3,
-      pos: a.end === 'bottom' ? 2 : 0,
+      // The host does not say where the list stands: the pages are counted (subfilePaging).
+      total: bar.total,
+      pos: this.subfilePreview?.index === ref.index ? this.subfilePreview.pos : bar.pos,
       page: 1,
       spanCells: 1,
     });
@@ -389,8 +429,15 @@ export class Renderer {
     this.draw();
   }
 
+  /** Shows the thumb of a synthetic bar at another page while it is dragged. */
+  setSubfilePreview(index: number, pos: number): void {
+    this.subfilePreview = { index, pos };
+    this.draw();
+  }
+
   clearThumbPreview(): void {
-    if (!this.thumbPreview) return;
+    if (!this.thumbPreview && !this.subfilePreview) return;
+    this.subfilePreview = undefined;
     this.thumbPreview = undefined;
     this.draw();
   }
@@ -505,7 +552,7 @@ export class Renderer {
     if (!this.screen || this.viewportW <= 0 || this.viewportH <= 0) return;
     const { rows, cols } = this.screen;
     this.pad = this.options.uiMode === 'enhanced' ? this.theme.enhanced.padding : 0;
-    this.gutter = this.options.subfileScrollBar ? GUTTER : 0;
+    this.gutter = GUTTER;
     const m = fitFont({
       boxW: this.viewportW - this.gutter,
       boxH: this.viewportH,
@@ -709,7 +756,8 @@ export class Renderer {
   private drawGui(enhanced: boolean): void {
     for (const ref of this.scrollBars()) {
       const hover = this.scrollHover && refKey(this.scrollHover.ref) === refKey(ref) ? this.scrollHover.hit.part : undefined;
-      this.drawScrollBar(this.geometryFor(ref), enhanced, hover, this.thumbPreview !== undefined && ref.kind === 'host' && this.thumbPreview.addr === ref.bar.addr);
+      const dragged = ref.kind === 'host' ? this.thumbPreview?.addr === ref.bar.addr : this.subfilePreview?.index === ref.index;
+      this.drawScrollBar(this.geometryFor(ref), enhanced, hover, dragged);
     }
   }
 

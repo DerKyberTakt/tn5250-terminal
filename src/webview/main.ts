@@ -204,7 +204,6 @@ function applyConfig(): void {
     watermarkOffsetY: st.watermarkOffsetY,
     underlineUrls: st.hotspotsUrl,
     keyButtons: st.hotspots3d || st.uiMode === 'enhanced',
-    subfileScrollBar: st.subfileScrollBar,
     demoMode: st.demoMode,
     demoLabel: st.demoLabel,
     demoColor: st.demoColor,
@@ -248,6 +247,7 @@ window.addEventListener('message', (ev: MessageEvent<HostToWebview>) => {
       renderOia();
       break;
     case 'oia':
+      noteRefusals(msg.oia.refused);
       oia = msg.oia;
       renderOia();
       break;
@@ -262,7 +262,7 @@ window.addEventListener('message', (ev: MessageEvent<HostToWebview>) => {
       renderOia();
       break;
     case 'alarm':
-      beep(880, 0.15);
+      beep(880, 0.15, 0.3);
       break;
     case 'paste':
       // Asked for from the find bar's box: the text goes there, not to the screen.
@@ -321,19 +321,36 @@ new ResizeObserver(() => {
 fitToViewport();
 
 let audio: AudioContext | undefined;
-function beep(freq: number, seconds: number): void {
+/**
+ * A tone of `freq` Hz at `level` (1 = full scale). The levels sit where a system sound does:
+ * at 0.03 and 0.08 the click and the tones could not be heard at an ordinary volume.
+ */
+function beep(freq: number, seconds: number, level: number): void {
   try {
     audio ??= new AudioContext();
+    // Made before the page had a key or a click, the context waits: start it now.
+    if (audio.state === 'suspended') void audio.resume();
     const osc = audio.createOscillator();
     const gain = audio.createGain();
     osc.frequency.value = freq;
-    gain.gain.value = seconds < 0.05 ? 0.03 : 0.08;
+    gain.gain.value = level;
     osc.connect(gain).connect(audio.destination);
     osc.start();
     osc.stop(audio.currentTime + seconds);
   } catch {
     // no audio device
   }
+}
+
+/** The session's count of refused keys and pastes at the last OIA; unknown until the first one, which never sounds. */
+let lastRefused: number | undefined;
+/**
+ * The error sound: the count grew, so a key or a paste was refused since the last OIA. A new
+ * session counts from 0 again, which only resets the mark.
+ */
+function noteRefusals(refused = 0): void {
+  if (lastRefused !== undefined && refused > lastRefused && config.settings.errorSound) beep(330, 0.12, 0.3);
+  lastRefused = refused;
 }
 
 /** Shift+Arrow selection, anchored at the cursor when it starts. */
@@ -441,7 +458,7 @@ window.addEventListener(
       else toggleRuleLine();
       return;
     }
-    if (config.settings.keyClick) beep(1200, 0.02);
+    if (config.settings.keyClick) beep(1200, 0.02, 0.15);
     // Not connected: the overlay takes Enter (reconnect) and Escape (stop); other keys go nowhere.
     if (overlay.visible) {
       overlay.handleKey(info.key);
@@ -498,7 +515,7 @@ viewport.addEventListener(
     e.preventDefault();
     wheelAccum += e.deltaY;
     if (Math.abs(wheelAccum) >= 100) {
-      post({ type: 'action', action: wheelAccum > 0 ? 'pageDown' : 'pageUp' });
+      pageKey(wheelAccum > 0);
       wheelAccum = 0;
     }
   },
@@ -586,11 +603,16 @@ function canvasPoint(e: MouseEvent): { x: number; y: number } {
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
+/** Page Down or Page Up to the host. */
+function pageKey(forward: boolean): void {
+  post({ type: 'action', action: forward ? 'pageDown' : 'pageUp' });
+}
+
 /** Sends one scroll request for a scroll bar part: arrows one row, the track a page. */
 function scrollRequest(target: ScrollBarTarget): void {
   const forward = target.hit.part === 'forward' || (target.hit.part === 'track' && target.hit.forward);
   if (target.ref.kind === 'subfile') {
-    post({ type: 'action', action: forward ? 'pageDown' : 'pageUp' });
+    pageKey(forward);
     return;
   }
   const increment = target.hit.part === 'track' ? 0 : 1;
@@ -621,7 +643,8 @@ canvas.addEventListener('mousedown', (e) => {
   const target = renderer.scrollBarAt(p.x, p.y);
   if (target) {
     e.preventDefault();
-    if (target.hit.part === 'thumb' && target.ref.kind === 'host') {
+    // The thumb is dragged, on both kinds of bar; a click on it that does not move does nothing.
+    if (target.hit.part === 'thumb') {
       thumbDrag = { target, startPx: target.geometry.horizontal ? p.x : p.y, units: 0 };
     } else {
       scrollRequest(target);
@@ -639,8 +662,14 @@ canvas.addEventListener('mousedown', (e) => {
 window.addEventListener('mousemove', (e) => {
   if (thumbDrag) {
     const { target, startPx } = thumbDrag;
-    if (target.ref.kind !== 'host') return;
     const p = canvasPoint(e);
+    if (target.ref.kind !== 'host') {
+      // A bar beside a More... list scrolls in pages.
+      const pages = renderer.subfileBar(target.ref.index);
+      thumbDrag.units = dragUnits(target.geometry, p.y - startPx, pages.total, pages.pos, 1);
+      renderer.setSubfilePreview(target.ref.index, pages.pos + thumbDrag.units);
+      return;
+    }
     const bar = target.ref.bar;
     const page = bar.horizontal ? bar.size - 2 : bar.size;
     thumbDrag.units = dragUnits(target.geometry, target.geometry.horizontal ? (p.x - startPx) / renderer.scaleX : p.y - startPx, bar.total, bar.pos, page);
@@ -675,6 +704,9 @@ window.addEventListener('mouseup', (e) => {
     renderer.clearThumbPreview();
     if (target.ref.kind === 'host' && units !== 0) {
       post({ type: 'scroll', addr: target.ref.bar.addr, forward: units > 0, increment: Math.abs(units) });
+    } else if (target.ref.kind === 'subfile') {
+      // One page key per page the thumb was moved; the host answers them in turn.
+      for (let i = 0; i < Math.abs(units); i++) pageKey(units > 0);
     }
     return;
   }
@@ -764,7 +796,7 @@ function findBarKey(info: KeyEventInfo): boolean {
     return true;
   }
   if ((result.action === 'pageUp' || result.action === 'pageDown') && !overlay.visible) {
-    post({ type: 'action', action: result.action });
+    pageKey(result.action === 'pageDown');
     return true;
   }
   return false;
@@ -790,8 +822,8 @@ document.addEventListener('copy', (e) => {
 });
 
 // Right-click menu on the screen: Copy (the selection, or the screen), Paste, Select All
-// (the three things ACS offers there) and Find. Escape, a click elsewhere or losing focus
-// closes it.
+// (the three things ACS offers there), Paste Next (on the ACS Edit menu) and Find. Escape,
+// a click elsewhere or losing focus closes it.
 const contextMenu = document.createElement('div');
 contextMenu.id = 'ctx-menu';
 contextMenu.hidden = true;
@@ -819,6 +851,8 @@ function showContextMenu(x: number, y: number): void {
   const live = lastScreen !== undefined;
   item(renderer.hasSelection ? 'Copy' : 'Copy Screen', live, () => copySelection());
   item('Paste', live, () => post({ type: 'paste' }));
+  // Grey until a paste leaves text over, as in ACS.
+  item('Paste Next', live && oia.pasteNext === true, () => post({ type: 'action', action: 'pasteNext' }));
   item('Select All', live, () => renderer.selectAll());
   item('Find', live, () => openFind());
   contextMenu.hidden = false;

@@ -173,10 +173,10 @@ tabIcon: string;
   typeAhead: boolean;
   alarm: boolean;
   keyClick: boolean;
+  /** A short low tone when a key or a paste is refused (the ACS clicker's Error choice). */
+  errorSound: boolean;
   /** What to do with PC commands the host sends through STRPCCMD (PC Organizer). */
   pcCommands: PcCommandPolicy;
-  /** Draw a scroll bar beside every subfile (More... / Bottom), not only the ones the host defines. */
-  subfileScrollBar: boolean;
 
   /** Key name -> action overrides on top of the ACS layout; null unbinds a key. */
   keymap: Record<string, KeyAction | null>;
@@ -314,8 +314,8 @@ tabIcon: '',
   typeAhead: true,
   alarm: true,
   keyClick: false,
+  errorSound: false,
   pcCommands: 'ask',
-  subfileScrollBar: false,
 
   keymap: {},
   keyWarningsIgnored: [],
@@ -582,6 +582,7 @@ export const KEY_ACTION_GROUPS: Array<{ title: string; actions: Array<[KeyAction
       ['eraseField', 'Erase Field'],
       ['copy', 'Copy'],
       ['paste', 'Paste'],
+      ['pasteNext', 'Paste Next'],
       ['find', 'Find on Screen'],
     ],
   },
